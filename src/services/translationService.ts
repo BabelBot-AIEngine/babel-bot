@@ -1,31 +1,61 @@
-import { MediaArticle, EditorialGuidelines, TranslationResult } from '../types';
+import { MediaArticle, EditorialGuidelines, TranslationResult } from "../types";
+import * as deepl from "deepl-node";
 
 export class TranslationService {
+  private translator?: deepl.Translator;
+
+  setup() {
+    const authKey = process.env.DEEPL_API_KEY;
+    if (!authKey) {
+      throw new Error("DEEPL_API_KEY environment variable is required");
+    }
+    this.translator = new deepl.Translator(authKey);
+  }
+
   async translateArticle(
     article: MediaArticle,
     guidelines: EditorialGuidelines,
     destinationLanguages: string[]
   ): Promise<TranslationResult[]> {
     const results: TranslationResult[] = [];
-
+    this.setup();
     for (const language of destinationLanguages) {
-      const translatedText = await this.performTranslation(article.text, language);
-      const reviewNotes = this.reviewAgainstGuidelines(translatedText, guidelines);
+      const translatedText = await this.performTranslation(
+        article.text,
+        language
+      );
+      const reviewNotes = this.reviewAgainstGuidelines(
+        translatedText,
+        guidelines
+      );
       const complianceScore = this.calculateComplianceScore(reviewNotes);
 
       results.push({
         language,
         translatedText,
         reviewNotes,
-        complianceScore
+        complianceScore,
       });
     }
 
     return results;
   }
 
-  private async performTranslation(text: string, language: string): Promise<string> {
-    return `[TRANSLATED TO ${language.toUpperCase()}] ${text}`;
+  private async performTranslation(
+    text: string,
+    language: string
+  ): Promise<string> {
+    try {
+      const result = await this.translator?.translateText(
+        text,
+        null,
+        language as deepl.TargetLanguageCode
+      );
+      return result?.text || "";
+    } catch (error) {
+      console.error(`Translation error for language ${language}:`, error);
+      return `Translation error for language ${language}: ${error}`;
+    }
   }
 
   private reviewAgainstGuidelines(
@@ -39,15 +69,19 @@ export class TranslationService {
     }
 
     if (guidelines.style) {
-      notes.push(`Style compliance: Verified against ${guidelines.style} style`);
+      notes.push(
+        `Style compliance: Verified against ${guidelines.style} style`
+      );
     }
 
     if (guidelines.targetAudience) {
-      notes.push(`Audience alignment: Verified for ${guidelines.targetAudience}`);
+      notes.push(
+        `Audience alignment: Verified for ${guidelines.targetAudience}`
+      );
     }
 
     if (guidelines.restrictions && guidelines.restrictions.length > 0) {
-      notes.push(`Restrictions checked: ${guidelines.restrictions.join(', ')}`);
+      notes.push(`Restrictions checked: ${guidelines.restrictions.join(", ")}`);
     }
 
     return notes;
