@@ -11,13 +11,18 @@ export class TranslationService {
 
   setup() {
     const authKey = process.env.DEEPL_API_KEY;
-    if (!authKey) {
+    const isDemoMode = process.env.DEMO_MODE === 'true';
+    
+    if (!authKey && !isDemoMode) {
       throw new Error("DEEPL_API_KEY environment variable is required");
     }
-    this.translator = new deepl.Translator(authKey);
-    this.anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    
+    if (authKey) {
+      this.translator = new deepl.Translator(authKey);
+      this.anthropic = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+      });
+    }
   }
 
   async translateArticle(
@@ -110,6 +115,13 @@ export class TranslationService {
     text: string,
     language: string
   ): Promise<string> {
+    const isDemoMode = process.env.DEMO_MODE === 'true';
+    
+    if (isDemoMode) {
+      // Simulate translation with demo text
+      return `[${language} Translation] ${text}`;
+    }
+    
     try {
       const result = await this.translator?.translateText(
         text,
@@ -127,6 +139,21 @@ export class TranslationService {
     translatedText: string,
     guidelines: EditorialGuidelines
   ): Promise<{ notes: string[]; score: number }> {
+    const isDemoMode = process.env.DEMO_MODE === 'true';
+    
+    if (isDemoMode) {
+      // Simulate review with demo data
+      return {
+        notes: [
+          "Translation maintains appropriate tone",
+          "Style is consistent with guidelines",
+          "Target audience considerations are met",
+          "No significant issues detected"
+        ],
+        score: Math.floor(Math.random() * 20) + 80 // Random score between 80-100
+      };
+    }
+    
     try {
       const prompt = this.buildReviewPrompt(translatedText, guidelines);
 

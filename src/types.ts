@@ -33,3 +33,24 @@ export interface TranslationResponse {
   translations: TranslationResult[];
   processedAt: string;
 }
+
+export interface TranslationTask {
+  id: string;
+  status: 'pending' | 'translating' | 'llm_verification' | 'human_review' | 'done' | 'failed';
+  mediaArticle: MediaArticle;
+  editorialGuidelines: EditorialGuidelines;
+  destinationLanguages: string[];
+  result?: TranslationResponse;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+  progress?: number;
+}
+
+export interface TaskStatusResponse {
+  task: TranslationTask;
+}
+
+export interface TaskListResponse {
+  tasks: TranslationTask[];
+}
