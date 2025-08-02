@@ -1,5 +1,4 @@
-import sqlite3 from "sqlite3";
-import path from "path";
+import { createClient, RedisClientType } from "redis";
 import { GuideType } from "../types";
 
 export interface TranslationTask {
@@ -24,192 +23,198 @@ export interface TranslationTask {
   updatedAt: string;
   progress?: number;
   guide?: GuideType;
+  useFullMarkdown?: boolean;
 }
 
 export class DatabaseService {
-  private db: sqlite3.Database;
-  private dbPath: string;
+  private client: RedisClientType;
+  private isConnected: boolean = false;
 
   constructor() {
-    this.dbPath = path.join(process.cwd(), "translation_tasks.db");
-    this.db = new sqlite3.Database(this.dbPath);
-    this.initializeDatabase();
+    this.client = createClient({
+      url: process.env.REDIS_URL || 'redis://localhost:6379'
+    });
+    this.initializeConnection();
   }
 
-  private initializeDatabase(): void {
-    const createTasksTable = `
-      CREATE TABLE IF NOT EXISTS translation_tasks (
-        id TEXT PRIMARY KEY,
-        status TEXT NOT NULL,
-        media_article TEXT NOT NULL,
-        editorial_guidelines TEXT NOT NULL,
-        destination_languages TEXT NOT NULL,
-        result TEXT,
-        error TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        progress INTEGER DEFAULT 0
-      )
-    `;
+  private async initializeConnection(): Promise<void> {
+    try {
+      this.client.on('error', (err) => {
+        console.error('Redis client error:', err);
+        this.isConnected = false;
+      });
 
-    this.db.run(createTasksTable, (err) => {
-      if (err) {
-        console.error("Error creating translation_tasks table:", err);
-      } else {
-        console.log("Database initialized successfully");
-      }
-    });
+      this.client.on('connect', () => {
+        console.log('Connected to Redis');
+        this.isConnected = true;
+      });
+
+      await this.client.connect();
+      console.log('Redis connection initialized successfully');
+    } catch (error) {
+      console.error('Error connecting to Redis:', error);
+      throw error;
+    }
   }
 
   async createTask(
     task: Omit<TranslationTask, "id" | "createdAt" | "updatedAt">
   ): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const id = `task_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-      const now = new Date().toISOString();
+    if (!this.isConnected) {
+      await this.initializeConnection();
+    }
 
-      const insertTask = `
-        INSERT INTO translation_tasks (
-          id, status, media_article, editorial_guidelines,
-          destination_languages, result, error, created_at, updated_at, progress, guide
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+    const id = `task_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+    const now = new Date().toISOString();
+    const createdAtTimestamp = Date.now();
 
-      this.db.run(
-        insertTask,
-        [
-          id,
-          task.status,
-          JSON.stringify(task.mediaArticle),
-          JSON.stringify(task.editorialGuidelines),
-          JSON.stringify(task.destinationLanguages),
-          task.result ? JSON.stringify(task.result) : null,
-          task.error || null,
-          now,
-          now,
-          task.progress || 0,
-          task.guide || null,
-        ],
-        function (err) {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(id);
-          }
-        }
-      );
-    });
+    const taskData = {
+      id,
+      status: task.status,
+      mediaArticle: JSON.stringify(task.mediaArticle),
+      editorialGuidelines: JSON.stringify(task.editorialGuidelines),
+      destinationLanguages: JSON.stringify(task.destinationLanguages),
+      result: task.result ? JSON.stringify(task.result) : '',
+      error: task.error || '',
+      createdAt: now,
+      updatedAt: now,
+      progress: (task.progress || 0).toString(),
+      guide: task.guide || '',
+    };
+
+    const multi = this.client.multi();
+    multi.hSet(`task:${id}`, taskData);
+    multi.sAdd(`tasks:status:${task.status}`, id);
+    multi.zAdd('tasks:created', { score: createdAtTimestamp, value: id });
+    
+    await multi.exec();
+    return id;
   }
 
   async updateTask(
     id: string,
     updates: Partial<TranslationTask>
   ): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const now = new Date().toISOString();
-      const fields = [];
-      const values = [];
+    if (!this.isConnected) {
+      await this.initializeConnection();
+    }
 
-      if (updates.status) {
-        fields.push("status = ?");
-        values.push(updates.status);
-      }
-      if (updates.result !== undefined) {
-        fields.push("result = ?");
-        values.push(JSON.stringify(updates.result));
-      }
-      if (updates.error !== undefined) {
-        fields.push("error = ?");
-        values.push(updates.error);
-      }
-      if (updates.progress !== undefined) {
-        fields.push("progress = ?");
-        values.push(updates.progress);
-      }
+    const taskExists = await this.client.exists(`task:${id}`);
+    if (!taskExists) {
+      throw new Error(`Task ${id} not found`);
+    }
 
-      fields.push("updated_at = ?");
-      values.push(now);
-      values.push(id);
+    const now = new Date().toISOString();
+    const updateData: Record<string, string> = {
+      updatedAt: now,
+    };
 
-      const updateQuery = `UPDATE translation_tasks SET ${fields.join(
-        ", "
-      )} WHERE id = ?`;
+    const currentTask = await this.client.hGetAll(`task:${id}`);
+    const multi = this.client.multi();
 
-      this.db.run(updateQuery, values, function (err) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      });
-    });
+    if (updates.status && updates.status !== currentTask.status) {
+      updateData.status = updates.status;
+      multi.sRem(`tasks:status:${currentTask.status}`, id);
+      multi.sAdd(`tasks:status:${updates.status}`, id);
+    }
+    if (updates.result !== undefined) {
+      updateData.result = JSON.stringify(updates.result);
+    }
+    if (updates.error !== undefined) {
+      updateData.error = updates.error;
+    }
+    if (updates.progress !== undefined) {
+      updateData.progress = updates.progress.toString();
+    }
+
+    multi.hSet(`task:${id}`, updateData);
+    await multi.exec();
   }
 
   async getTask(id: string): Promise<TranslationTask | null> {
-    return new Promise((resolve, reject) => {
-      const query = "SELECT * FROM translation_tasks WHERE id = ?";
+    if (!this.isConnected) {
+      await this.initializeConnection();
+    }
 
-      this.db.get(query, [id], (err, row: any) => {
-        if (err) {
-          reject(err);
-        } else if (!row) {
-          resolve(null);
-        } else {
-          resolve(this.mapRowToTask(row));
-        }
-      });
-    });
+    const taskData = await this.client.hGetAll(`task:${id}`);
+    
+    if (!taskData || Object.keys(taskData).length === 0) {
+      return null;
+    }
+
+    return this.mapRedisDataToTask(taskData);
   }
 
   async getAllTasks(): Promise<TranslationTask[]> {
-    return new Promise((resolve, reject) => {
-      const query = "SELECT * FROM translation_tasks ORDER BY created_at DESC";
+    if (!this.isConnected) {
+      await this.initializeConnection();
+    }
 
-      this.db.all(query, [], (err, rows: any[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(rows.map((row) => this.mapRowToTask(row)));
-        }
-      });
-    });
+    const taskIds = await this.client.zRange('tasks:created', 0, -1);
+    const sortedTaskIds = taskIds.reverse();
+    
+    if (sortedTaskIds.length === 0) {
+      return [];
+    }
+
+    const tasks: TranslationTask[] = [];
+    for (const taskId of sortedTaskIds) {
+      const taskData = await this.client.hGetAll(`task:${taskId}`);
+      if (taskData && Object.keys(taskData).length > 0) {
+        tasks.push(this.mapRedisDataToTask(taskData));
+      }
+    }
+
+    return tasks;
   }
 
   async getTasksByStatus(
     status: TranslationTask["status"]
   ): Promise<TranslationTask[]> {
-    return new Promise((resolve, reject) => {
-      const query =
-        "SELECT * FROM translation_tasks WHERE status = ? ORDER BY created_at DESC";
+    if (!this.isConnected) {
+      await this.initializeConnection();
+    }
 
-      this.db.all(query, [status], (err, rows: any[]) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(rows.map((row) => this.mapRowToTask(row)));
-        }
-      });
-    });
+    const taskIds = await this.client.sMembers(`tasks:status:${status}`);
+    
+    if (taskIds.length === 0) {
+      return [];
+    }
+
+    const tasks: TranslationTask[] = [];
+    for (const taskId of taskIds) {
+      const taskData = await this.client.hGetAll(`task:${taskId}`);
+      if (taskData && Object.keys(taskData).length > 0) {
+        tasks.push(this.mapRedisDataToTask(taskData));
+      }
+    }
+
+    tasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return tasks;
   }
 
-  private mapRowToTask(row: any): TranslationTask {
+  private mapRedisDataToTask(data: Record<string, string>): TranslationTask {
     return {
-      id: row.id,
-      status: row.status,
-      mediaArticle: JSON.parse(row.media_article),
-      editorialGuidelines: JSON.parse(row.editorial_guidelines),
-      destinationLanguages: JSON.parse(row.destination_languages),
-      result: row.result ? JSON.parse(row.result) : undefined,
-      error: row.error || undefined,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      progress: row.progress || 0,
+      id: data.id,
+      status: data.status as TranslationTask['status'],
+      mediaArticle: JSON.parse(data.mediaArticle),
+      editorialGuidelines: JSON.parse(data.editorialGuidelines),
+      destinationLanguages: JSON.parse(data.destinationLanguages),
+      result: data.result ? JSON.parse(data.result) : undefined,
+      error: data.error || undefined,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+      progress: parseInt(data.progress) || 0,
+      guide: (data.guide && data.guide !== '') ? data.guide as GuideType : undefined,
     };
   }
 
-  close(): void {
-    this.db.close();
+  async close(): Promise<void> {
+    if (this.isConnected) {
+      await this.client.disconnect();
+      this.isConnected = false;
+    }
   }
 }

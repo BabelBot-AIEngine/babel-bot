@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -14,8 +14,10 @@ import {
   Box,
   Typography,
   SelectChangeEvent,
+  CircularProgress,
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
+import { fetchAvailableLanguages, getLanguageDisplayName } from '../../utils/languageUtils';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -26,21 +28,6 @@ interface CreateTaskDialogProps {
     destinationLanguages: string[];
   }) => void;
 }
-
-const availableLanguages = [
-  'Spanish',
-  'French',
-  'German',
-  'Italian',
-  'Portuguese',
-  'Dutch',
-  'Polish',
-  'Russian',
-  'Japanese',
-  'Chinese',
-  'Korean',
-  'Arabic',
-];
 
 const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   open,
@@ -53,9 +40,47 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const [style, setStyle] = useState('');
   const [targetAudience, setTargetAudience] = useState('');
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<Array<{ code: string; name: string }>>([]);
+  const [languagesLoading, setLanguagesLoading] = useState(false);
+  const [languagesError, setLanguagesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadLanguages = async () => {
+      if (open && availableLanguages.length === 0 && !languagesLoading) {
+        setLanguagesLoading(true);
+        setLanguagesError(null);
+        try {
+          const languages = await fetchAvailableLanguages();
+          setAvailableLanguages(languages);
+        } catch (error) {
+          console.error('Failed to load languages:', error);
+          setLanguagesError(error instanceof Error ? error.message : 'Failed to load languages');
+        } finally {
+          setLanguagesLoading(false);
+        }
+      }
+    };
+
+    loadLanguages();
+  }, [open, availableLanguages.length, languagesLoading]);
 
   const handleLanguageChange = (event: SelectChangeEvent<string[]>) => {
     setSelectedLanguages(event.target.value as string[]);
+  };
+
+  const retryLoadLanguages = async () => {
+    setAvailableLanguages([]);
+    setLanguagesError(null);
+    setLanguagesLoading(true);
+    try {
+      const languages = await fetchAvailableLanguages();
+      setAvailableLanguages(languages);
+    } catch (error) {
+      console.error('Failed to load languages:', error);
+      setLanguagesError(error instanceof Error ? error.message : 'Failed to load languages');
+    } finally {
+      setLanguagesLoading(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -274,12 +299,13 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               multiple
               value={selectedLanguages}
               onChange={handleLanguageChange}
+              disabled={languagesLoading || !!languagesError}
               renderValue={(selected) => (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {selected.map((value) => (
                     <Chip 
                       key={value} 
-                      label={value} 
+                      label={getLanguageDisplayName(value)} 
                       size="small"
                       sx={{
                         background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
@@ -291,11 +317,45 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                 </Box>
               )}
             >
-              {availableLanguages.map((language) => (
-                <MenuItem key={language} value={language}>
-                  {language}
+              {languagesLoading ? (
+                <MenuItem disabled>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CircularProgress size={16} />
+                    <Typography variant="body2">Loading languages from DeepL...</Typography>
+                  </Box>
                 </MenuItem>
-              ))}
+              ) : languagesError ? (
+                <MenuItem disabled>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, py: 1 }}>
+                    <Typography variant="body2" color="error">
+                      Failed to load languages
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {languagesError}
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={retryLoadLanguages}
+                      variant="outlined"
+                      sx={{ mt: 1 }}
+                    >
+                      Retry
+                    </Button>
+                  </Box>
+                </MenuItem>
+              ) : availableLanguages.length === 0 ? (
+                <MenuItem disabled>
+                  <Typography variant="body2" color="text.secondary">
+                    No languages available
+                  </Typography>
+                </MenuItem>
+              ) : (
+                availableLanguages.map((language) => (
+                  <MenuItem key={language.code} value={language.code}>
+                    {language.name}
+                  </MenuItem>
+                ))
+              )}
             </Select>
             {selectedLanguages.length === 0 && (
               <Typography variant="caption" sx={{ color: '#ef4444', mt: 1 }}>
@@ -325,7 +385,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
           onClick={handleSubmit}
           variant="contained"
           startIcon={<AddIcon />}
-          disabled={!text.trim() || selectedLanguages.length === 0}
+          disabled={!text.trim() || selectedLanguages.length === 0 || languagesLoading || !!languagesError || availableLanguages.length === 0}
           sx={{
             background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
             borderRadius: 2,

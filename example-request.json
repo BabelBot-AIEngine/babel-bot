@@ -10,5 +10,5 @@
     "restrictions": ["no technical jargon", "keep sentences under 20 words"],
     "requirements": ["include scientific accuracy", "maintain engaging tone"]
   },
-  "destinationLanguages": ["es", "fr", "de"]
+  "destinationLanguages": ["ES", "FR", "DE"]
 }

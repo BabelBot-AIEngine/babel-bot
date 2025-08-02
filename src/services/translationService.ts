@@ -1,49 +1,113 @@
-import { MediaArticle, EditorialGuidelines, TranslationResult, GuideType } from "../types";
+import {
+  MediaArticle,
+  EditorialGuidelines,
+  TranslationResult,
+  GuideType,
+} from "../types";
 import * as deepl from "deepl-node";
 import * as fs from "fs";
 import * as path from "path";
-import Anthropic from "@anthropic-ai/sdk";
+import { ReviewService } from "./reviewService";
 
 export class TranslationService {
   private translator?: deepl.Translator;
+  private reviewService: ReviewService;
 
-  private anthropic?: Anthropic;
+  constructor() {
+    this.reviewService = new ReviewService();
+  }
 
   setup() {
     const authKey = process.env.DEEPL_API_KEY;
-    const isDemoMode = process.env.DEMO_MODE === 'true';
-    
+    const isDemoMode = process.env.DEMO_MODE === "true";
+
     if (!authKey && !isDemoMode) {
       throw new Error("DEEPL_API_KEY environment variable is required");
     }
-    
+
     if (authKey) {
       this.translator = new deepl.Translator(authKey);
-      this.anthropic = new Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-      });
     }
+  }
+
+  async getAvailableLanguages(): Promise<Array<{ code: string; name: string }>> {
+    this.setup();
+    const isDemoMode = process.env.DEMO_MODE === "true";
+
+    if (isDemoMode) {
+      // In demo mode, simulate actual DeepL supported languages with proper codes
+      return [
+        { code: 'BG', name: 'Bulgarian' },
+        { code: 'CS', name: 'Czech' },
+        { code: 'DA', name: 'Danish' },
+        { code: 'DE', name: 'German' },
+        { code: 'EL', name: 'Greek' },
+        { code: 'EN-GB', name: 'English (British)' },
+        { code: 'EN-US', name: 'English (American)' },
+        { code: 'ES', name: 'Spanish' },
+        { code: 'ET', name: 'Estonian' },
+        { code: 'FI', name: 'Finnish' },
+        { code: 'FR', name: 'French' },
+        { code: 'HU', name: 'Hungarian' },
+        { code: 'ID', name: 'Indonesian' },
+        { code: 'IT', name: 'Italian' },
+        { code: 'JA', name: 'Japanese' },
+        { code: 'KO', name: 'Korean' },
+        { code: 'LT', name: 'Lithuanian' },
+        { code: 'LV', name: 'Latvian' },
+        { code: 'NB', name: 'Norwegian (Bokmål)' },
+        { code: 'NL', name: 'Dutch' },
+        { code: 'PL', name: 'Polish' },
+        { code: 'PT-BR', name: 'Portuguese (Brazilian)' },
+        { code: 'PT-PT', name: 'Portuguese (European)' },
+        { code: 'RO', name: 'Romanian' },
+        { code: 'RU', name: 'Russian' },
+        { code: 'SK', name: 'Slovak' },
+        { code: 'SL', name: 'Slovenian' },
+        { code: 'SV', name: 'Swedish' },
+        { code: 'TR', name: 'Turkish' },
+        { code: 'UK', name: 'Ukrainian' },
+        { code: 'ZH', name: 'Chinese (Simplified)' }
+      ];
+    }
+
+    if (!this.translator) {
+      throw new Error("DeepL translator not initialized");
+    }
+
+    const languages = await this.translator.getTargetLanguages();
+    return languages.map(lang => ({
+      code: lang.code,
+      name: lang.name
+    }));
   }
 
   async translateArticle(
     article: MediaArticle,
     guidelines: EditorialGuidelines,
     destinationLanguages: string[],
-    guide?: GuideType
+    guide?: GuideType,
+    useFullMarkdown?: boolean
   ): Promise<TranslationResult[]> {
     const results: TranslationResult[] = [];
     this.setup();
 
-    const effectiveGuidelines = await this.loadGuidelinesByType(guide || 'financialtimes', guidelines);
+    const { effectiveGuidelines, contextText } = await this.loadGuidelinesByType(
+      guide || "financialtimes",
+      guidelines,
+      useFullMarkdown
+    );
 
     for (const language of destinationLanguages) {
       const translatedText = await this.performTranslation(
         article.text,
-        language
+        language,
+        contextText
       );
-      const reviewResult = await this.reviewAgainstGuidelines(
+      const reviewResult = await this.reviewService.reviewAgainstGuidelines(
         translatedText,
-        effectiveGuidelines
+        effectiveGuidelines,
+        contextText
       );
       const complianceScore = reviewResult.score;
 
@@ -58,191 +122,171 @@ export class TranslationService {
     return results;
   }
 
-  private async loadGuidelinesByType(guide: GuideType, fallbackGuidelines: EditorialGuidelines): Promise<EditorialGuidelines> {
+  private async loadGuidelinesByType(
+    guide: GuideType,
+    fallbackGuidelines: EditorialGuidelines,
+    useFullMarkdown?: boolean
+  ): Promise<{ effectiveGuidelines: EditorialGuidelines; contextText: string }> {
     try {
-      const guidelinePath = path.join(process.cwd(), 'editorial', 'guidelines', `${guide}.md`);
-      const markdownContent = fs.readFileSync(guidelinePath, 'utf-8');
+      const fileExtension = useFullMarkdown ? "md" : "txt";
+      const guidelinePath = path.join(
+        process.cwd(),
+        "editorial",
+        "guidelines",
+        `${guide}.${fileExtension}`
+      );
       
-      return this.parseMarkdownGuidelines(markdownContent, fallbackGuidelines);
+      let fileContent: string;
+      try {
+        fileContent = fs.readFileSync(guidelinePath, "utf-8");
+      } catch (error) {
+        const fallbackExtension = useFullMarkdown ? "txt" : "md";
+        const fallbackPath = path.join(
+          process.cwd(),
+          "editorial",
+          "guidelines",
+          `${guide}.${fallbackExtension}`
+        );
+        fileContent = fs.readFileSync(fallbackPath, "utf-8");
+      }
+
+      let effectiveGuidelines: EditorialGuidelines;
+      if (useFullMarkdown) {
+        effectiveGuidelines = this.parseMarkdownGuidelines(fileContent, fallbackGuidelines);
+      } else {
+        effectiveGuidelines = { ...fallbackGuidelines };
+      }
+
+      let contextText = fileContent;
+      
+      const hasOverrides = Object.keys(fallbackGuidelines).some(
+        key => fallbackGuidelines[key as keyof EditorialGuidelines] !== undefined
+      );
+      
+      if (hasOverrides) {
+        contextText += "\n\n--- EDITORIAL OVERRIDES ---\n\n";
+        if (fallbackGuidelines.tone) {
+          contextText += `Tone Override: ${fallbackGuidelines.tone}\n`;
+        }
+        if (fallbackGuidelines.style) {
+          contextText += `Style Override: ${fallbackGuidelines.style}\n`;
+        }
+        if (fallbackGuidelines.targetAudience) {
+          contextText += `Target Audience Override: ${fallbackGuidelines.targetAudience}\n`;
+        }
+        if (fallbackGuidelines.restrictions?.length) {
+          contextText += `Restrictions Override: ${fallbackGuidelines.restrictions.join(", ")}\n`;
+        }
+        if (fallbackGuidelines.requirements?.length) {
+          contextText += `Requirements Override: ${fallbackGuidelines.requirements.join(", ")}\n`;
+        }
+      }
+
+      return { effectiveGuidelines, contextText };
     } catch (error) {
-      console.warn(`Could not load guidelines for ${guide}, using fallback:`, error);
-      return fallbackGuidelines;
+      console.warn(
+        `Could not load guidelines for ${guide}, using fallback:`,
+        error
+      );
+      
+      let contextText = "Using fallback editorial guidelines.\n\n";
+      if (fallbackGuidelines.tone) {
+        contextText += `Tone: ${fallbackGuidelines.tone}\n`;
+      }
+      if (fallbackGuidelines.style) {
+        contextText += `Style: ${fallbackGuidelines.style}\n`;
+      }
+      if (fallbackGuidelines.targetAudience) {
+        contextText += `Target Audience: ${fallbackGuidelines.targetAudience}\n`;
+      }
+      if (fallbackGuidelines.restrictions?.length) {
+        contextText += `Restrictions: ${fallbackGuidelines.restrictions.join(", ")}\n`;
+      }
+      if (fallbackGuidelines.requirements?.length) {
+        contextText += `Requirements: ${fallbackGuidelines.requirements.join(", ")}\n`;
+      }
+      
+      return { effectiveGuidelines: fallbackGuidelines, contextText };
     }
   }
 
-  private parseMarkdownGuidelines(content: string, fallback: EditorialGuidelines): EditorialGuidelines {
+  private parseMarkdownGuidelines(
+    content: string,
+    fallback: EditorialGuidelines
+  ): EditorialGuidelines {
     const guidelines: EditorialGuidelines = { ...fallback };
-    
+
     const toneMatch = content.match(/## Tone\s*([\s\S]*?)(?=##|$)/);
     if (toneMatch) {
       guidelines.tone = toneMatch[1].trim();
     }
-    
+
     const styleMatch = content.match(/## Style\s*([\s\S]*?)(?=##|$)/);
     if (styleMatch) {
       guidelines.style = styleMatch[1].trim();
     }
-    
-    const audienceMatch = content.match(/## Target Audience\s*([\s\S]*?)(?=##|$)/);
+
+    const audienceMatch = content.match(
+      /## Target Audience\s*([\s\S]*?)(?=##|$)/
+    );
     if (audienceMatch) {
       guidelines.targetAudience = audienceMatch[1].trim();
     }
-    
-    const restrictionsMatch = content.match(/## Restrictions\s*([\s\S]*?)(?=##|$)/);
+
+    const restrictionsMatch = content.match(
+      /## Restrictions\s*([\s\S]*?)(?=##|$)/
+    );
     if (restrictionsMatch) {
       const restrictionsList = restrictionsMatch[1]
-        .split('\n')
-        .filter(line => line.trim().startsWith('-'))
-        .map(line => line.replace(/^-\s*/, '').trim())
-        .filter(item => item.length > 0);
+        .split("\n")
+        .filter((line) => line.trim().startsWith("-"))
+        .map((line) => line.replace(/^-\s*/, "").trim())
+        .filter((item) => item.length > 0);
       guidelines.restrictions = restrictionsList;
     }
-    
-    const requirementsMatch = content.match(/## Requirements\s*([\s\S]*?)(?=##|$)/);
+
+    const requirementsMatch = content.match(
+      /## Requirements\s*([\s\S]*?)(?=##|$)/
+    );
     if (requirementsMatch) {
       const requirementsList = requirementsMatch[1]
-        .split('\n')
-        .filter(line => line.trim().startsWith('-'))
-        .map(line => line.replace(/^-\s*/, '').trim())
-        .filter(item => item.length > 0);
+        .split("\n")
+        .filter((line) => line.trim().startsWith("-"))
+        .map((line) => line.replace(/^-\s*/, "").trim())
+        .filter((item) => item.length > 0);
       guidelines.requirements = requirementsList;
     }
-    
+
     return guidelines;
   }
 
   private async performTranslation(
     text: string,
-    language: string
+    language: string,
+    context?: string
   ): Promise<string> {
-    const isDemoMode = process.env.DEMO_MODE === 'true';
-    
+    const isDemoMode = process.env.DEMO_MODE === "true";
+
     if (isDemoMode) {
       // Simulate translation with demo text
       return `[${language} Translation] ${text}`;
     }
-    
+
     try {
+      const translateOptions: any = {
+        context: context || undefined
+      };
+      
       const result = await this.translator?.translateText(
         text,
         null,
-        language as deepl.TargetLanguageCode
+        language as deepl.TargetLanguageCode,
+        translateOptions
       );
       return result?.text || "";
     } catch (error) {
       console.error(`Translation error for language ${language}:`, error);
       return `Translation error for language ${language}: ${error}`;
     }
-  }
-
-  private async reviewAgainstGuidelines(
-    translatedText: string,
-    guidelines: EditorialGuidelines
-  ): Promise<{ notes: string[]; score: number }> {
-    const isDemoMode = process.env.DEMO_MODE === 'true';
-    
-    if (isDemoMode) {
-      // Simulate review with demo data
-      return {
-        notes: [
-          "Translation maintains appropriate tone",
-          "Style is consistent with guidelines",
-          "Target audience considerations are met",
-          "No significant issues detected"
-        ],
-        score: Math.floor(Math.random() * 20) + 80 // Random score between 80-100
-      };
-    }
-    
-    try {
-      const prompt = this.buildReviewPrompt(translatedText, guidelines);
-
-      const response = await this.anthropic?.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        messages: [{ role: "user", content: prompt }],
-      });
-
-      const reviewText =
-        response?.content[0].type === "text" ? response?.content[0].text : "";
-      return this.parseReviewResponse(reviewText);
-    } catch (error) {
-      console.error("LLM review error:", error);
-      return {
-        notes: [
-          `Review failed: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
-        ],
-        score: 0, // Default score for failed reviews
-      };
-    }
-  }
-
-  private buildReviewPrompt(
-    text: string,
-    guidelines: EditorialGuidelines
-  ): string {
-    let prompt = `Please review the following text against the editorial guidelines provided. Provide specific feedback on compliance and areas for improvement.
-
-Text to review:
-"${text}"
-
-Editorial Guidelines:`;
-
-    if (guidelines.tone) {
-      prompt += `\n- Tone: ${guidelines.tone}`;
-    }
-    if (guidelines.style) {
-      prompt += `\n- Style: ${guidelines.style}`;
-    }
-    if (guidelines.targetAudience) {
-      prompt += `\n- Target Audience: ${guidelines.targetAudience}`;
-    }
-    if (guidelines.restrictions && guidelines.restrictions.length > 0) {
-      prompt += `\n- Restrictions: ${guidelines.restrictions.join(", ")}`;
-    }
-    if (guidelines.requirements && guidelines.requirements.length > 0) {
-      prompt += `\n- Requirements: ${guidelines.requirements.join(", ")}`;
-    }
-
-    prompt += `\n\nPlease provide your review as a numbered list of specific observations, each on a new line starting with a number and period (e.g., "1. The tone is...").
-
-Additionally, at the end of your review, please provide an editorialComplianceScore as a number between 1 and 100, where 1 indicates very poor compliance with the guidelines and 100 indicates perfect compliance. Format this as: "editorialComplianceScore: [number]"`;
-
-    return prompt;
-  }
-
-  private parseReviewResponse(reviewText: string): {
-    notes: string[];
-    score: number;
-  } {
-    const lines = reviewText.split("\n").filter((line) => line.trim());
-    const notes: string[] = [];
-    let score = 50; // Default score if not found
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-
-      // Check for editorialComplianceScore
-      const scoreMatch = trimmed.match(
-        /editorialComplianceScore:\s*(\d+(?:\.\d+)?)/i
-      );
-      if (scoreMatch) {
-        score = Math.min(Math.max(parseFloat(scoreMatch[1]), 1), 100); // Ensure score is between 1-100
-        continue; // Skip adding this line to notes
-      }
-
-      if (trimmed.match(/^\d+\./)) {
-        notes.push(trimmed.replace(/^\d+\.\s*/, ""));
-      } else if (trimmed && !trimmed.match(/^(please|here|the following)/i)) {
-        notes.push(trimmed);
-      }
-    }
-
-    return {
-      notes: notes.length > 0 ? notes : ["Review completed successfully"],
-      score,
-    };
   }
 }

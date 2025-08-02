@@ -13,6 +13,7 @@ import {
   Error as ErrorIcon,
 } from '@mui/icons-material';
 import { TranslationTask, getLanguageStatesForTask, hasMultipleLanguageStates, LanguageTaskStatus } from '../../types';
+import { getLanguageDisplayName } from '../../utils/languageUtils';
 
 interface TaskCardProps {
   task: TranslationTask;
@@ -186,7 +187,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
                   {task.result.translations.map((translation, index) => (
                     <Box key={index} sx={{ mb: 1, p: 1, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
                       <Typography variant="caption" sx={{ display: 'block' }}>
-                        <strong>{translation.language}:</strong>
+                        <strong>{getLanguageDisplayName(translation.language)}:</strong>
                         <Chip
                           label={translation.status || 'done'}
                           size="small"
@@ -218,7 +219,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
             return (
               <Chip
                 key={lang}
-                label={lang}
+                label={getLanguageDisplayName(lang)}
                 size="small"
                 variant={hasSplitStates ? "filled" : "outlined"}
                 sx={{ 
