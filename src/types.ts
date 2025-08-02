@@ -104,6 +104,47 @@ export const hasMultipleLanguageStates = (task: TranslationTask): boolean => {
   return uniqueStates.size > 1;
 };
 
+export interface TaskCardDisplayInfo {
+  task: TranslationTask;
+  filteredLanguages: string[];
+  isPartialDisplay: boolean;
+}
+
+export const getLanguagesForStatus = (
+  task: TranslationTask,
+  targetStatus: LanguageTaskStatus
+): string[] => {
+  const languageStates = getLanguageStatesForTask(task);
+  const languages: string[] = [];
+  
+  languageStates.forEach((status, language) => {
+    if (status === targetStatus) {
+      languages.push(language);
+    }
+  });
+  
+  return languages;
+};
+
+export const getTaskDisplayInfoForStatus = (
+  task: TranslationTask,
+  targetStatus: LanguageTaskStatus
+): TaskCardDisplayInfo | null => {
+  const languagesInStatus = getLanguagesForStatus(task, targetStatus);
+  
+  if (languagesInStatus.length === 0) {
+    return null;
+  }
+  
+  const isPartialDisplay = hasMultipleLanguageStates(task);
+  
+  return {
+    task,
+    filteredLanguages: languagesInStatus,
+    isPartialDisplay
+  };
+};
+
 // Prolific Filter Types
 export interface ProlificFilterChoice {
   [key: string]: string;
