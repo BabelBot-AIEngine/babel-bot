@@ -30,6 +30,58 @@ export class TranslationService {
     }
   }
 
+  async getAvailableLanguages(): Promise<Array<{ code: string; name: string }>> {
+    this.setup();
+    const isDemoMode = process.env.DEMO_MODE === "true";
+
+    if (isDemoMode) {
+      // Return demo languages when in demo mode
+      return [
+        { code: 'es', name: 'Spanish' },
+        { code: 'fr', name: 'French' },
+        { code: 'de', name: 'German' },
+        { code: 'it', name: 'Italian' },
+        { code: 'pt', name: 'Portuguese' },
+        { code: 'nl', name: 'Dutch' },
+        { code: 'pl', name: 'Polish' },
+        { code: 'ru', name: 'Russian' },
+        { code: 'ja', name: 'Japanese' },
+        { code: 'zh', name: 'Chinese (Simplified)' },
+        { code: 'ko', name: 'Korean' },
+        { code: 'ar', name: 'Arabic' },
+      ];
+    }
+
+    if (!this.translator) {
+      throw new Error("DeepL translator not initialized");
+    }
+
+    try {
+      const languages = await this.translator.getTargetLanguages();
+      return languages.map(lang => ({
+        code: lang.code,
+        name: lang.name
+      }));
+    } catch (error) {
+      console.error("Failed to fetch languages from DeepL:", error);
+      // Fallback to demo languages if API fails
+      return [
+        { code: 'es', name: 'Spanish' },
+        { code: 'fr', name: 'French' },
+        { code: 'de', name: 'German' },
+        { code: 'it', name: 'Italian' },
+        { code: 'pt', name: 'Portuguese' },
+        { code: 'nl', name: 'Dutch' },
+        { code: 'pl', name: 'Polish' },
+        { code: 'ru', name: 'Russian' },
+        { code: 'ja', name: 'Japanese' },
+        { code: 'zh', name: 'Chinese (Simplified)' },
+        { code: 'ko', name: 'Korean' },
+        { code: 'ar', name: 'Arabic' },
+      ];
+    }
+  }
+
   async translateArticle(
     article: MediaArticle,
     guidelines: EditorialGuidelines,
