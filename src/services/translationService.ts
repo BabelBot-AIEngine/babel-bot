@@ -1,21 +1,30 @@
-import { MediaArticle, EditorialGuidelines, TranslationResult } from '../types';
+import { MediaArticle, EditorialGuidelines, TranslationResult } from "../types";
+import * as deepl from "deepl-node";
 import Anthropic from '@anthropic-ai/sdk';
 
 export class TranslationService {
-  private anthropic: Anthropic;
+  private translator?: deepl.Translator;
 
-  constructor() {
-    this.anthropic = new Anthropic({
+  private anthropic?: Anthropic;
+
+  setup() {
+    const authKey = process.env.DEEPL_API_KEY;
+    if (!authKey) {
+      throw new Error("DEEPL_API_KEY environment variable is required");
+    }
+    this.translator = new deepl.Translator(authKey);
+this.anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
   }
+
   async translateArticle(
     article: MediaArticle,
     guidelines: EditorialGuidelines,
     destinationLanguages: string[]
   ): Promise<TranslationResult[]> {
     const results: TranslationResult[] = [];
-
+    this.setup();
     for (const language of destinationLanguages) {
       const translatedText = await this.performTranslation(article.text, language);
       const reviewNotes = await this.reviewAgainstGuidelines(translatedText, guidelines);
@@ -25,15 +34,28 @@ export class TranslationService {
         language,
         translatedText,
         reviewNotes,
-        complianceScore
+        complianceScore,
       });
     }
 
     return results;
   }
 
-  private async performTranslation(text: string, language: string): Promise<string> {
-    return `[TRANSLATED TO ${language.toUpperCase()}] ${text}`;
+  private async performTranslation(
+    text: string,
+    language: string
+  ): Promise<string> {
+    try {
+      const result = await this.translator?.translateText(
+        text,
+        null,
+        language as deepl.TargetLanguageCode
+      );
+      return result?.text || "";
+    } catch (error) {
+      console.error(`Translation error for language ${language}:`, error);
+      return `Translation error for language ${language}: ${error}`;
+    }
   }
 
   private async reviewAgainstGuidelines(
