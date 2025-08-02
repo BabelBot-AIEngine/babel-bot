@@ -1,3 +1,5 @@
+export type GuideType = 'financialtimes' | 'monzo' | 'prolific';
+
 export interface MediaArticle {
   text: string;
   title?: string;
@@ -16,6 +18,7 @@ export interface TranslationRequest {
   mediaArticle: MediaArticle;
   editorialGuidelines: EditorialGuidelines;
   destinationLanguages: string[];
+  guide?: GuideType;
 }
 
 export interface TranslationResult {

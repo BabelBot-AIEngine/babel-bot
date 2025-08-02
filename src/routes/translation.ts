@@ -1,13 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { TranslationService } from '../services/translationService';
-import { TranslationRequest, TranslationResponse } from '../types';
+import { TranslationRequest, TranslationResponse, GuideType } from '../types';
 
 const router = Router();
 const translationService = new TranslationService();
 
 router.post('/translate', async (req: Request, res: Response) => {
   try {
-    const { mediaArticle, editorialGuidelines, destinationLanguages }: TranslationRequest = req.body;
+    const { mediaArticle, editorialGuidelines, destinationLanguages, guide }: TranslationRequest = req.body;
 
     if (!mediaArticle || !mediaArticle.text) {
       return res.status(400).json({
@@ -21,10 +21,17 @@ router.post('/translate', async (req: Request, res: Response) => {
       });
     }
 
+    if (guide && !['financialtimes', 'monzo', 'prolific'].includes(guide)) {
+      return res.status(400).json({
+        error: 'Invalid guide parameter. Must be one of: financialtimes, monzo, prolific'
+      });
+    }
+
     const translations = await translationService.translateArticle(
       mediaArticle,
       editorialGuidelines || {},
-      destinationLanguages
+      destinationLanguages,
+      guide
     );
 
     const response: TranslationResponse = {
