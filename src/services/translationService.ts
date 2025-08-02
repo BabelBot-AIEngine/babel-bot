@@ -1,13 +1,13 @@
-import { MediaArticle, EditorialGuidelines, TranslationResult } from '../types';
-import * as deepl from 'deepl-node';
+import { MediaArticle, EditorialGuidelines, TranslationResult } from "../types";
+import * as deepl from "deepl-node";
 
 export class TranslationService {
-  private translator: deepl.Translator;
+  private translator?: deepl.Translator;
 
-  constructor() {
+  setup() {
     const authKey = process.env.DEEPL_API_KEY;
     if (!authKey) {
-      throw new Error('DEEPL_API_KEY environment variable is required');
+      throw new Error("DEEPL_API_KEY environment variable is required");
     }
     this.translator = new deepl.Translator(authKey);
   }
@@ -18,30 +18,43 @@ export class TranslationService {
     destinationLanguages: string[]
   ): Promise<TranslationResult[]> {
     const results: TranslationResult[] = [];
-
+    this.setup();
     for (const language of destinationLanguages) {
-      const translatedText = await this.performTranslation(article.text, language);
-      const reviewNotes = this.reviewAgainstGuidelines(translatedText, guidelines);
+      const translatedText = await this.performTranslation(
+        article.text,
+        language
+      );
+      const reviewNotes = this.reviewAgainstGuidelines(
+        translatedText,
+        guidelines
+      );
       const complianceScore = this.calculateComplianceScore(reviewNotes);
 
       results.push({
         language,
         translatedText,
         reviewNotes,
-        complianceScore
+        complianceScore,
       });
     }
 
     return results;
   }
 
-  private async performTranslation(text: string, language: string): Promise<string> {
+  private async performTranslation(
+    text: string,
+    language: string
+  ): Promise<string> {
     try {
-      const result = await this.translator.translateText(text, null, language as deepl.TargetLanguageCode);
-      return result.text;
+      const result = await this.translator?.translateText(
+        text,
+        null,
+        language as deepl.TargetLanguageCode
+      );
+      return result?.text || "";
     } catch (error) {
       console.error(`Translation error for language ${language}:`, error);
-      throw new Error(`Failed to translate to ${language}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return `Translation error for language ${language}: ${error}`;
     }
   }
 
@@ -56,15 +69,19 @@ export class TranslationService {
     }
 
     if (guidelines.style) {
-      notes.push(`Style compliance: Verified against ${guidelines.style} style`);
+      notes.push(
+        `Style compliance: Verified against ${guidelines.style} style`
+      );
     }
 
     if (guidelines.targetAudience) {
-      notes.push(`Audience alignment: Verified for ${guidelines.targetAudience}`);
+      notes.push(
+        `Audience alignment: Verified for ${guidelines.targetAudience}`
+      );
     }
 
     if (guidelines.restrictions && guidelines.restrictions.length > 0) {
-      notes.push(`Restrictions checked: ${guidelines.restrictions.join(', ')}`);
+      notes.push(`Restrictions checked: ${guidelines.restrictions.join(", ")}`);
     }
 
     return notes;
