@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { TranslationService } from '../services/translationService';
 import { TaskService } from '../services/taskService';
-import { TranslationRequest, TranslationResponse, TaskStatusResponse, TaskListResponse } from '../types';
+import { GuideType, TranslationRequest, TranslationResponse, TaskStatusResponse, TaskListResponse } from '../types';
 
 const router = Router();
 const translationService = new TranslationService();
@@ -9,7 +9,7 @@ const taskService = new TaskService();
 
 router.post('/translate', async (req: Request, res: Response) => {
   try {
-    const { mediaArticle, editorialGuidelines, destinationLanguages }: TranslationRequest = req.body;
+    const { mediaArticle, editorialGuidelines, destinationLanguages, guide }: TranslationRequest = req.body;
 
     if (!mediaArticle || !mediaArticle.text) {
       return res.status(400).json({
@@ -22,11 +22,18 @@ router.post('/translate', async (req: Request, res: Response) => {
         error: 'At least one destination language is required'
       });
     }
+    
+    if (guide && !['financialtimes', 'monzo', 'prolific'].includes(guide)) {
+      return res.status(400).json({
+        error: 'Invalid guide parameter. Must be one of: financialtimes, monzo, prolific'
+      });
+    }
 
     const taskId = await taskService.createTranslationTask(
       mediaArticle,
       editorialGuidelines || {},
-      destinationLanguages
+      destinationLanguages,
+      guide
     );
 
     res.json({
