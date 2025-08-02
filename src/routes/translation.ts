@@ -126,4 +126,19 @@ router.get("/tasks", async (req: Request, res: Response) => {
   }
 });
 
+router.delete("/tasks", async (req: Request, res: Response) => {
+  try {
+    const deletedCount = await taskService.deleteAllTasks();
+    res.json({
+      message: `Successfully deleted ${deletedCount} tasks`,
+      deletedCount,
+    });
+  } catch (error) {
+    console.error("Error deleting tasks:", error);
+    res.status(500).json({
+      error: "Internal server error",
+    });
+  }
+});
+
 export default router;

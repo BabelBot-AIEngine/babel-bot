@@ -1,5 +1,5 @@
 import { createClient, RedisClientType } from "redis";
-import { GuideType } from "../types";
+import { GuideType, HumanReviewBatch } from "../types";
 
 export interface TranslationTask {
   id: string;
@@ -23,6 +23,7 @@ export interface TranslationTask {
   updatedAt: string;
   progress?: number;
   guide?: GuideType;
+  humanReviewBatches?: HumanReviewBatch[];
   useFullMarkdown?: boolean;
 }
 
@@ -82,6 +83,7 @@ export class DatabaseService {
       updatedAt: now,
       progress: (task.progress || 0).toString(),
       guide: task.guide || '',
+      humanReviewBatches: task.humanReviewBatches ? JSON.stringify(task.humanReviewBatches) : '',
     };
 
     const multi = this.client.multi();
@@ -127,6 +129,9 @@ export class DatabaseService {
     }
     if (updates.progress !== undefined) {
       updateData.progress = updates.progress.toString();
+    }
+    if (updates.humanReviewBatches !== undefined) {
+      updateData.humanReviewBatches = JSON.stringify(updates.humanReviewBatches);
     }
 
     multi.hSet(`task:${id}`, updateData);
@@ -208,7 +213,48 @@ export class DatabaseService {
       updatedAt: data.updatedAt,
       progress: parseInt(data.progress) || 0,
       guide: (data.guide && data.guide !== '') ? data.guide as GuideType : undefined,
+      humanReviewBatches: (data.humanReviewBatches && data.humanReviewBatches !== '') ? JSON.parse(data.humanReviewBatches) : undefined,
     };
+  }
+
+  async getTasksByBatchId(batchId: string): Promise<TranslationTask[]> {
+    if (!this.isConnected) {
+      await this.initializeConnection();
+    }
+
+    const allTasks = await this.getAllTasks();
+    return allTasks.filter(task => 
+      task.humanReviewBatches?.some(batch => batch.batchId === batchId)
+    );
+  }
+
+  async getTasksByStudyId(studyId: string): Promise<TranslationTask[]> {
+    if (!this.isConnected) {
+      await this.initializeConnection();
+    }
+
+    const allTasks = await this.getAllTasks();
+    return allTasks.filter(task => 
+      task.humanReviewBatches?.some(batch => batch.studyId === studyId)
+    );
+  }
+
+  async deleteTask(id: string): Promise<void> {
+    if (!this.isConnected) {
+      await this.initializeConnection();
+    }
+
+    const taskData = await this.client.hGetAll(`task:${id}`);
+    if (!taskData || Object.keys(taskData).length === 0) {
+      throw new Error(`Task ${id} not found`);
+    }
+
+    const multi = this.client.multi();
+    multi.del(`task:${id}`);
+    multi.sRem(`tasks:status:${taskData.status}`, id);
+    multi.zRem('tasks:created', id);
+    
+    await multi.exec();
   }
 
   async close(): Promise<void> {

@@ -1,5 +1,15 @@
 export type GuideType = "financialtimes" | "monzo" | "prolific";
 
+export interface HumanReviewConfig {
+  confidenceThreshold: number;
+  workspaceId: string;
+  taskDetails: {
+    taskName: string;
+    taskIntroduction: string;
+    taskSteps: string;
+  };
+}
+
 export interface MediaArticle {
   text: string;
   title?: string;
@@ -36,12 +46,23 @@ export interface TranslationResult {
   reviewNotes?: string[];
   complianceScore?: number;
   status?: LanguageTaskStatus;
+  batchId?: string;
+  studyId?: string;
 }
 
 export interface TranslationResponse {
   originalArticle: MediaArticle;
   translations: TranslationResult[];
   processedAt: string;
+}
+
+export interface HumanReviewBatch {
+  language: string;
+  batchId: string;
+  studyId: string;
+  datasetId: string;
+  projectId: string;
+  createdAt: string;
 }
 
 export interface TranslationTask {
@@ -63,6 +84,7 @@ export interface TranslationTask {
   createdAt: string;
   updatedAt: string;
   progress?: number;
+  humanReviewBatches?: HumanReviewBatch[];
 }
 
 export interface TaskStatusResponse {
