@@ -11,6 +11,8 @@ import {
   DatasetStatus,
   CreateBatchInstructionsRequest,
   BatchInstructions,
+  CreateWorkspaceRequest,
+  Workspace,
 } from "../types/prolific";
 
 export class ProlificService {
@@ -117,6 +119,41 @@ export class ProlificService {
       method: "POST",
       body: JSON.stringify(instructionsData),
     });
+  }
+
+  async getAllWorkspaces(): Promise<Workspace[]> {
+    return this.makeRequest("/workspaces");
+  }
+
+  async getWorkspace(workspaceId: string): Promise<Workspace> {
+    return this.makeRequest(`/workspaces/${workspaceId}/`);
+  }
+
+  async createWorkspace(workspaceData: CreateWorkspaceRequest): Promise<Workspace> {
+    return this.makeRequest("/workspaces/", {
+      method: "POST",
+      body: JSON.stringify(workspaceData),
+    });
+  }
+
+  async findWorkspaceByTitle(title: string): Promise<Workspace | null> {
+    const workspaces = await this.getAllWorkspaces();
+    return workspaces.find(workspace => workspace.title === title) || null;
+  }
+
+  async ensureWorkspaceExists(title: string): Promise<Workspace> {
+    const existingWorkspace = await this.findWorkspaceByTitle(title);
+    
+    if (existingWorkspace) {
+      console.log(`Using existing workspace: ${title} (${existingWorkspace.id})`);
+      return existingWorkspace;
+    }
+
+    console.log(`Creating new workspace: ${title}`);
+    const newWorkspace = await this.createWorkspace({ title });
+    console.log(`Created workspace: ${title} (${newWorkspace.id})`);
+    
+    return newWorkspace;
   }
 
   async createStudy(studyData: CreateStudyRequest): Promise<Study> {

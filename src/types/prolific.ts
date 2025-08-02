@@ -149,3 +149,14 @@ export interface BatchInstructions {
   created_at: string;
   updated_at: string;
 }
+
+export interface CreateWorkspaceRequest {
+  title: string;
+}
+
+export interface Workspace {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
