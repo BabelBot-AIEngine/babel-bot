@@ -9,6 +9,8 @@ import {
   Batch,
   UploadUrlResponse,
   DatasetStatus,
+  CreateBatchInstructionsRequest,
+  BatchInstructions,
 } from "../types/prolific";
 
 export class ProlificService {
@@ -108,6 +110,13 @@ export class ProlificService {
     }
     
     throw new Error(`Dataset ${datasetId} did not become ready within ${maxAttempts * intervalMs / 1000} seconds`);
+  }
+
+  async createBatchInstructions(batchId: string, instructionsData: CreateBatchInstructionsRequest): Promise<BatchInstructions> {
+    return this.makeRequest(`/data-collection/batches/${batchId}/instructions`, {
+      method: "POST",
+      body: JSON.stringify(instructionsData),
+    });
   }
 
   async createStudy(studyData: CreateStudyRequest): Promise<Study> {

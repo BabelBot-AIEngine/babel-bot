@@ -124,3 +124,28 @@ export interface UploadUrlResponse {
   upload_url: string;
   download_url: string;
 }
+
+export interface InstructionOption {
+  label: string;
+  value: string;
+  heading?: string;
+}
+
+export interface Instruction {
+  type: "free_text" | "multiple_choice" | "multiple_choice_with_free_text";
+  description: string;
+  options?: InstructionOption[];
+  answer_limit?: number;
+}
+
+export interface CreateBatchInstructionsRequest {
+  instructions: Instruction[];
+}
+
+export interface BatchInstructions {
+  id: string;
+  batch_id: string;
+  instructions: Instruction[];
+  created_at: string;
+  updated_at: string;
+}
