@@ -40,7 +40,7 @@ import {
   Star as StarIcon,
   StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
-import { TranslationTask, LanguageTaskStatus } from '../../types';
+import { TranslationTask, LanguageTaskStatus, getLanguageStatesForTask } from '../../types';
 import { getLanguageDisplayName } from '../../utils/languageUtils';
 import TranslationTimeline from './TranslationTimeline';
 
@@ -406,23 +406,68 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
                     <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 2 }}>
                       Target Languages
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {task.destinationLanguages.map(lang => (
-                        <Chip
-                          key={lang}
-                          label={getLanguageDisplayName(lang)}
-                          sx={{ 
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            background: getStatusGradient(),
-                            color: 'white',
-                            '&:hover': {
-                              transform: 'scale(1.05)',
-                            },
-                            transition: 'transform 0.2s ease',
-                          }}
-                        />
-                      ))}
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                      {task.destinationLanguages.map(lang => {
+                        const languageStates = getLanguageStatesForTask(task);
+                        const langStatus = languageStates.get(lang) || 'pending';
+                        const isFailedLang = langStatus === 'failed';
+                        
+                        const getLanguageStatusGradient = (status: LanguageTaskStatus) => {
+                          switch (status) {
+                            case 'pending':
+                              return 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)';
+                            case 'translating':
+                              return 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)';
+                            case 'llm_verification':
+                              return 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)';
+                            case 'human_review':
+                              return 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)';
+                            case 'done':
+                              return 'linear-gradient(135deg, #10b981 0%, #34d399 100%)';
+                            case 'failed':
+                              return 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)';
+                            default:
+                              return 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
+                          }
+                        };
+                        
+                        return (
+                          <Box key={lang} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                            <Chip
+                              label={getLanguageDisplayName(lang)}
+                              sx={{ 
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                background: getLanguageStatusGradient(langStatus),
+                                color: 'white',
+                                border: isFailedLang ? '2px solid #dc2626' : 'none',
+                                '&:hover': {
+                                  transform: 'scale(1.05)',
+                                },
+                                transition: 'transform 0.2s ease',
+                              }}
+                            />
+                            <Typography variant="caption" sx={{ 
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              color: isFailedLang ? '#dc2626' : '#64748b',
+                              textTransform: 'uppercase',
+                              textAlign: 'center'
+                            }}>
+                              {langStatus.replace('_', ' ')}
+                            </Typography>
+                            {isFailedLang && (
+                              <Box sx={{ 
+                                width: 6, 
+                                height: 6, 
+                                borderRadius: '50%', 
+                                backgroundColor: '#dc2626',
+                                animation: 'pulse 2s infinite'
+                              }} />
+                            )}
+                          </Box>
+                        );
+                      })}
                     </Box>
                   </CardContent>
                 </Card>
