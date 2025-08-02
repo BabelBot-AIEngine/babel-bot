@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { TaskService } from "../services/taskService";
 import { TranslationService } from "../services/translationService";
+import { TaskProcessor } from "../services/taskProcessor";
 import {
   TranslationRequest,
   TaskStatusResponse,
@@ -8,8 +9,19 @@ import {
 } from "../types";
 
 const router = Router();
-const taskService = new TaskService();
 const translationService = new TranslationService();
+
+function getTaskService(req: Request): TaskService {
+  const taskProcessor: TaskProcessor | undefined = req.app.locals.taskProcessor;
+  if (taskProcessor) {
+    return taskProcessor.getTaskService();
+  }
+  
+  if (!req.app.locals.taskService) {
+    req.app.locals.taskService = new TaskService();
+  }
+  return req.app.locals.taskService;
+}
 
 router.post("/translate", async (req: Request, res: Response) => {
   try {
@@ -40,6 +52,7 @@ router.post("/translate", async (req: Request, res: Response) => {
       });
     }
 
+    const taskService = getTaskService(req);
     const taskId = await taskService.createTranslationTask(
       mediaArticle,
       editorialGuidelines || {},
@@ -87,6 +100,7 @@ router.get("/health", (req: Request, res: Response) => {
 router.get("/tasks/:taskId", async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
+    const taskService = getTaskService(req);
     const task = await taskService.getTask(taskId);
 
     if (!task) {
@@ -108,6 +122,7 @@ router.get("/tasks/:taskId", async (req: Request, res: Response) => {
 router.get("/tasks", async (req: Request, res: Response) => {
   try {
     const { status } = req.query;
+    const taskService = getTaskService(req);
 
     let tasks;
     if (status && typeof status === "string") {

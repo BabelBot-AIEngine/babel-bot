@@ -7,9 +7,12 @@
     "build": "tsc && npm run build:client",
     "build:client": "webpack --mode production",
     "start": "node dist/index.js",
-    "dev": "concurrently \"ts-node src/index.ts\" \"npm run dev:client\"",
+    "start:parallel": "USE_PARALLEL_PROCESSING=true node dist/server.js",
+    "dev": "concurrently \"ts-node src/server.ts\" \"npm run dev:client\"",
+    "dev:parallel": "USE_PARALLEL_PROCESSING=true concurrently \"ts-node src/server.ts\" \"npm run dev:client\"",
     "dev:client": "webpack serve --mode development",
     "test": "jest",
+    "test:parallel": "ts-node src/scripts/testParallelProcessing.ts",
     "lint": "eslint src/**/*.ts",
     "typecheck": "tsc --noEmit"
   },

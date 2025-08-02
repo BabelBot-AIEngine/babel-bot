@@ -1,6 +1,7 @@
 import { DatabaseService, TranslationTask } from "../database/dbService";
 import { TranslationService } from "./translationService";
 import { ReviewService } from "./reviewService";
+import { TaskQueue } from "./taskQueue";
 import {
   MediaArticle,
   EditorialGuidelines,
@@ -12,11 +13,13 @@ export class TaskService {
   private dbService: DatabaseService;
   private translationService: TranslationService;
   private reviewService: ReviewService;
+  private taskQueue?: TaskQueue;
 
-  constructor() {
+  constructor(taskQueue?: TaskQueue) {
     this.dbService = new DatabaseService();
     this.translationService = new TranslationService();
     this.reviewService = new ReviewService();
+    this.taskQueue = taskQueue;
   }
 
   async createTranslationTask(
@@ -36,7 +39,16 @@ export class TaskService {
       useFullMarkdown,
     });
 
-    this.processTaskAsync(taskId);
+    if (this.taskQueue) {
+      await this.taskQueue.addTask({
+        taskId,
+        type: 'translate',
+        timestamp: Date.now()
+      });
+    } else {
+      this.processTaskAsync(taskId);
+    }
+    
     return taskId;
   }
 
@@ -193,5 +205,111 @@ export class TaskService {
     status: TranslationTask["status"]
   ): Promise<TranslationTask[]> {
     return this.dbService.getTasksByStatus(status);
+  }
+
+  async processTranslationStep(taskId: string): Promise<void> {
+    const task = await this.dbService.getTask(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+
+    if (task.status !== 'pending') {
+      console.log(`Task ${taskId} is not in pending state, skipping translation step`);
+      return;
+    }
+
+    await this.dbService.updateTask(taskId, {
+      status: "translating",
+      progress: 25,
+    });
+
+    await this.sleep(1000);
+
+    const translations = await this.translationService.translateArticle(
+      task.mediaArticle,
+      task.editorialGuidelines,
+      task.destinationLanguages,
+      task.guide,
+      task.useFullMarkdown
+    );
+
+    await this.dbService.updateTask(taskId, {
+      status: "llm_verification",
+      progress: 60,
+      result: {
+        originalArticle: task.mediaArticle,
+        translations,
+        processedAt: new Date().toISOString(),
+      }
+    });
+
+    if (this.taskQueue) {
+      await this.taskQueue.addTask({
+        taskId,
+        type: 'verify',
+        timestamp: Date.now()
+      });
+    } else {
+      await this.processVerificationStep(taskId);
+    }
+  }
+
+  async processVerificationStep(taskId: string): Promise<void> {
+    const task = await this.dbService.getTask(taskId);
+    if (!task || !task.result) {
+      throw new Error(`Task ${taskId} not found or missing translation result`);
+    }
+
+    if (task.status !== 'llm_verification') {
+      console.log(`Task ${taskId} is not in verification state, skipping verification step`);
+      return;
+    }
+
+    await this.sleep(1500);
+
+    const verifiedTranslations = await this.verifyTranslations(
+      task.result.translations,
+      task.editorialGuidelines
+    );
+
+    const taskStatus = this.determineOverallTaskStatus(verifiedTranslations);
+    const progress = taskStatus === "done" ? 100 : 80;
+
+    await this.dbService.updateTask(taskId, {
+      status: taskStatus,
+      progress,
+      result: {
+        ...task.result,
+        translations: verifiedTranslations,
+      },
+    });
+
+    if (taskStatus === "human_review") {
+      if (this.taskQueue) {
+        await this.taskQueue.addTask({
+          taskId,
+          type: 'review',
+          timestamp: Date.now()
+        });
+      } else {
+        await this.processReviewStep(taskId);
+      }
+    }
+  }
+
+  async processReviewStep(taskId: string): Promise<void> {
+    const task = await this.dbService.getTask(taskId);
+    if (!task || !task.result) {
+      throw new Error(`Task ${taskId} not found or missing result`);
+    }
+
+    if (task.status !== 'human_review') {
+      console.log(`Task ${taskId} is not in human review state, skipping review step`);
+      return;
+    }
+
+    await this.sleep(2000);
+
+    await this.processHumanReview(taskId, task.result.translations);
   }
 }
