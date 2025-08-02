@@ -16,6 +16,7 @@ router.post("/translate", async (req: Request, res: Response) => {
       editorialGuidelines,
       destinationLanguages,
       guide,
+      useFullMarkdown,
     }: TranslationRequest = req.body;
 
     if (!mediaArticle || !mediaArticle.text) {
@@ -41,7 +42,8 @@ router.post("/translate", async (req: Request, res: Response) => {
       mediaArticle,
       editorialGuidelines || {},
       destinationLanguages,
-      guide
+      guide,
+      useFullMarkdown
     );
 
     res.json({

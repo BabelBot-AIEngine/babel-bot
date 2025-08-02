@@ -23,6 +23,7 @@ export interface TranslationTask {
   updatedAt: string;
   progress?: number;
   guide?: GuideType;
+  useFullMarkdown?: boolean;
 }
 
 export class DatabaseService {
