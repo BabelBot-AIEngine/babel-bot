@@ -312,7 +312,7 @@ ${this.formatFiltersForPrompt(qualityFilters)}
 
 INSTRUCTIONS:
 1. Analyze the article's subject matter, complexity, cultural context, and target languages
-2. Recommend 3-7 filters that would ensure high-quality evaluation
+2. Recommend up to 3 filters that would ensure high-quality evaluation
 3. Use ONLY filter_ids from the available filters list above
 4. Provide confidence scores between 1-100
 5. Include specific recommended values for each filter
