@@ -8,7 +8,7 @@ import {
   Chip,
 } from '@mui/material';
 import TaskCard from './TaskCard';
-import { TranslationTask } from '../../types';
+import { TranslationTask, hasMultipleLanguageStates, getLanguageStatesForTask } from '../../types';
 
 interface KanbanBoardProps {
   tasks: TranslationTask[];
@@ -29,6 +29,19 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
     return tasks.filter(task => task.status === status);
   };
 
+  const getLanguageCountByStatus = (status: string) => {
+    let count = 0;
+    tasks.forEach(task => {
+      if (hasMultipleLanguageStates(task)) {
+        const languageStates = getLanguageStatesForTask(task);
+        languageStates.forEach(langStatus => {
+          if (langStatus === status) count++;
+        });
+      }
+    });
+    return count;
+  };
+
   return (
     <Box>
       {loading && <LinearProgress sx={{ mb: 2 }} />}
@@ -36,6 +49,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
       <Grid container spacing={2}>
         {statusColumns.map(column => {
           const columnTasks = getTasksByStatus(column.status);
+          const splitLanguageCount = getLanguageCountByStatus(column.status);
           return (
             <Grid item xs={12} md={2} key={column.status}>
               <Paper
@@ -63,14 +77,27 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
                   >
                     {column.title}
                   </Typography>
-                  <Chip
-                    label={columnTasks.length}
-                    size="small"
-                    sx={{
-                      backgroundColor: column.color,
-                      color: 'white',
-                    }}
-                  />
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    <Chip
+                      label={columnTasks.length}
+                      size="small"
+                      sx={{
+                        backgroundColor: column.color,
+                        color: 'white',
+                      }}
+                    />
+                    {splitLanguageCount > 0 && (
+                      <Chip
+                        label={`+${splitLanguageCount}`}
+                        size="small"
+                        sx={{
+                          backgroundColor: '#ff5722',
+                          color: 'white',
+                          fontSize: '0.7rem',
+                        }}
+                      />
+                    )}
+                  </Box>
                 </Box>
                 
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
