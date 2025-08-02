@@ -1,1 +1,1 @@
-# ai-news-editor
+# babel-bot
