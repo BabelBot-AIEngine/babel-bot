@@ -88,7 +88,7 @@ export class TranslationService {
             error instanceof Error ? error.message : "Unknown error"
           }`,
         ],
-        score: 50, // Default score for failed reviews
+        score: 0, // Default score for failed reviews
       };
     }
   }
@@ -127,21 +127,26 @@ Additionally, at the end of your review, please provide an editorialComplianceSc
     return prompt;
   }
 
-  private parseReviewResponse(reviewText: string): { notes: string[]; score: number } {
+  private parseReviewResponse(reviewText: string): {
+    notes: string[];
+    score: number;
+  } {
     const lines = reviewText.split("\n").filter((line) => line.trim());
     const notes: string[] = [];
     let score = 50; // Default score if not found
 
     for (const line of lines) {
       const trimmed = line.trim();
-      
+
       // Check for editorialComplianceScore
-      const scoreMatch = trimmed.match(/editorialComplianceScore:\s*(\d+(?:\.\d+)?)/i);
+      const scoreMatch = trimmed.match(
+        /editorialComplianceScore:\s*(\d+(?:\.\d+)?)/i
+      );
       if (scoreMatch) {
         score = Math.min(Math.max(parseFloat(scoreMatch[1]), 1), 100); // Ensure score is between 1-100
         continue; // Skip adding this line to notes
       }
-      
+
       if (trimmed.match(/^\d+\./)) {
         notes.push(trimmed.replace(/^\d+\.\s*/, ""));
       } else if (trimmed && !trimmed.match(/^(please|here|the following)/i)) {
@@ -151,8 +156,7 @@ Additionally, at the end of your review, please provide an editorialComplianceSc
 
     return {
       notes: notes.length > 0 ? notes : ["Review completed successfully"],
-      score
+      score,
     };
   }
-
 }
