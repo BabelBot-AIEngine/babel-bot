@@ -96,21 +96,75 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-      <DialogTitle>Create New Translation Task</DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={handleClose} 
+      maxWidth="md" 
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3,
+          background: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+        }
+      }}
+      BackdropProps={{
+        sx: {
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(4px)',
+        }
+      }}
+    >
+      <Box
+        sx={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          color: 'white',
+          p: 3,
+          borderRadius: '12px 12px 0 0',
+        }}
+      >
+        <Typography 
+          variant="h5" 
+          sx={{ 
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+          }}
+        >
+          <AddIcon sx={{ mr: 2, fontSize: 28 }} />
+          Create New Translation Task
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
+          Transform your content across languages with AI-powered precision
+        </Typography>
+      </Box>
       
-      <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+      <DialogContent sx={{ p: 4 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <TextField
-            label="Article Title (optional)"
+            label="Article Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             fullWidth
             variant="outlined"
+            placeholder="Enter an optional title for your article"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                background: 'rgba(255, 255, 255, 0.8)',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.9)',
+                },
+                '&.Mui-focused': {
+                  background: 'rgba(255, 255, 255, 1)',
+                },
+              },
+            }}
           />
 
           <TextField
-            label="Article Text"
+            label="Article Content"
             value={text}
             onChange={(e) => setText(e.target.value)}
             multiline
@@ -119,42 +173,103 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
             variant="outlined"
             required
             error={!text.trim()}
-            helperText={!text.trim() ? 'Article text is required' : ''}
+            helperText={!text.trim() ? 'Article content is required' : `${text.length} characters`}
+            placeholder="Paste or type your article content here..."
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                background: 'rgba(255, 255, 255, 0.8)',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.9)',
+                },
+                '&.Mui-focused': {
+                  background: 'rgba(255, 255, 255, 1)',
+                },
+              },
+            }}
           />
 
-          <Typography variant="h6" sx={{ mt: 2 }}>
-            Editorial Guidelines (optional)
-          </Typography>
+          <Box
+            sx={{
+              p: 3,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1px solid #e2e8f0',
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="h6" sx={{ mb: 2, color: '#1e293b', fontWeight: 600 }}>
+              Editorial Guidelines
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 3, color: '#64748b' }}>
+              Define the tone and style to ensure consistent translations
+            </Typography>
 
-          <TextField
-            label="Tone"
-            value={tone}
-            onChange={(e) => setTone(e.target.value)}
-            fullWidth
-            variant="outlined"
-            placeholder="e.g., Professional, Casual, Formal"
-          />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              <TextField
+                label="Tone"
+                value={tone}
+                onChange={(e) => setTone(e.target.value)}
+                fullWidth
+                variant="outlined"
+                placeholder="Professional, Casual, Formal, Friendly..."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    background: 'white',
+                  },
+                }}
+              />
 
-          <TextField
-            label="Style"
-            value={style}
-            onChange={(e) => setStyle(e.target.value)}
-            fullWidth
-            variant="outlined"
-            placeholder="e.g., Journalistic, Academic, Marketing"
-          />
+              <TextField
+                label="Style"
+                value={style}
+                onChange={(e) => setStyle(e.target.value)}
+                fullWidth
+                variant="outlined"
+                placeholder="Journalistic, Academic, Marketing, Technical..."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    background: 'white',
+                  },
+                }}
+              />
 
-          <TextField
-            label="Target Audience"
-            value={targetAudience}
-            onChange={(e) => setTargetAudience(e.target.value)}
-            fullWidth
-            variant="outlined"
-            placeholder="e.g., General public, Technical experts"
-          />
+              <TextField
+                label="Target Audience"
+                value={targetAudience}
+                onChange={(e) => setTargetAudience(e.target.value)}
+                fullWidth
+                variant="outlined"
+                placeholder="General public, Technical experts, Students..."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    background: 'white',
+                  },
+                }}
+              />
+            </Box>
+          </Box>
 
-          <FormControl fullWidth required error={selectedLanguages.length === 0}>
-            <InputLabel>Destination Languages</InputLabel>
+          <FormControl 
+            fullWidth 
+            required 
+            error={selectedLanguages.length === 0}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                background: 'rgba(255, 255, 255, 0.8)',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.9)',
+                },
+                '&.Mui-focused': {
+                  background: 'rgba(255, 255, 255, 1)',
+                },
+              },
+            }}
+          >
+            <InputLabel>Destination Languages *</InputLabel>
             <Select
               multiple
               value={selectedLanguages}
@@ -162,7 +277,16 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               renderValue={(selected) => (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {selected.map((value) => (
-                    <Chip key={value} label={value} size="small" />
+                    <Chip 
+                      key={value} 
+                      label={value} 
+                      size="small"
+                      sx={{
+                        background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
+                        color: 'white',
+                        fontWeight: 600,
+                      }}
+                    />
                   ))}
                 </Box>
               )}
@@ -173,17 +297,54 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                 </MenuItem>
               ))}
             </Select>
+            {selectedLanguages.length === 0 && (
+              <Typography variant="caption" sx={{ color: '#ef4444', mt: 1 }}>
+                Please select at least one destination language
+              </Typography>
+            )}
           </FormControl>
         </Box>
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
+      <DialogActions sx={{ p: 4, pt: 0 }}>
+        <Button 
+          onClick={handleClose}
+          sx={{
+            borderRadius: 2,
+            px: 3,
+            py: 1,
+            color: '#64748b',
+            '&:hover': {
+              background: 'rgba(100, 116, 139, 0.04)',
+            },
+          }}
+        >
+          Cancel
+        </Button>
         <Button
           onClick={handleSubmit}
           variant="contained"
           startIcon={<AddIcon />}
           disabled={!text.trim() || selectedLanguages.length === 0}
+          sx={{
+            background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
+            borderRadius: 2,
+            px: 4,
+            py: 1,
+            fontWeight: 600,
+            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.4)',
+            '&:hover': {
+              background: 'linear-gradient(45deg, #4f46e5 30%, #7c3aed 90%)',
+              transform: 'translateY(-1px)',
+              boxShadow: '0 6px 16px rgba(99, 102, 241, 0.5)',
+            },
+            '&:disabled': {
+              background: 'rgba(148, 163, 184, 0.3)',
+              color: 'rgba(148, 163, 184, 0.7)',
+              boxShadow: 'none',
+            },
+            transition: 'all 0.2s ease',
+          }}
         >
           Create Task
         </Button>
