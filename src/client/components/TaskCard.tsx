@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Card,
   CardContent,
@@ -6,13 +6,8 @@ import {
   Chip,
   Box,
   LinearProgress,
-  IconButton,
-  Collapse,
-  Divider,
 } from '@mui/material';
 import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
   Language as LanguageIcon,
   Schedule as ScheduleIcon,
   Error as ErrorIcon,
@@ -21,14 +16,10 @@ import { TranslationTask } from '../../types';
 
 interface TaskCardProps {
   task: TranslationTask;
+  onClick: () => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
-  const [expanded, setExpanded] = useState(false);
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
+const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
 
   const getStatusIcon = () => {
     switch (task.status) {
@@ -65,6 +56,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
   return (
     <Card
       elevation={0}
+      onClick={onClick}
       sx={{
         background: 'rgba(255, 255, 255, 0.8)',
         backdropFilter: 'blur(10px)',
@@ -120,20 +112,17 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
           >
             #{task.id.split('_')[1]}
           </Typography>
-          <IconButton
-            size="small"
-            onClick={() => setExpanded(!expanded)}
+          <Typography
+            variant="caption"
             sx={{
-              background: 'rgba(0, 0, 0, 0.04)',
-              '&:hover': {
-                background: 'rgba(0, 0, 0, 0.08)',
-                transform: 'scale(1.1)',
-              },
-              transition: 'all 0.2s ease',
+              color: '#64748b',
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              opacity: 0.8,
             }}
           >
-            {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-          </IconButton>
+            Click for details
+          </Typography>
         </Box>
 
         <Typography
@@ -216,7 +205,6 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
           <Box
             sx={{
               p: 1.5,
-              mb: 2,
               background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
               border: '1px solid #fecaca',
               borderRadius: 1.5,
@@ -232,60 +220,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
               }}
             >
               <ErrorIcon sx={{ fontSize: 14, mr: 0.5 }} />
-              {task.error}
+              Error occurred
             </Typography>
           </Box>
         )}
-
-        <Collapse in={expanded}>
-          <Divider sx={{ my: 2, background: 'rgba(0, 0, 0, 0.06)' }} />
-          
-          <Box sx={{ display: 'flex', gap: 3, mb: 2 }}>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block' }}>
-                Created
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#1e293b', fontWeight: 500 }}>
-                {formatDate(task.createdAt)}
-              </Typography>
-            </Box>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block' }}>
-                Updated
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#1e293b', fontWeight: 500 }}>
-                {formatDate(task.updatedAt)}
-              </Typography>
-            </Box>
-          </Box>
-
-          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 1 }}>
-            Article Content
-          </Typography>
-          <Box
-            sx={{
-              p: 2,
-              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-              border: '1px solid #e2e8f0',
-              borderRadius: 2,
-              fontSize: '0.75rem',
-              maxHeight: 120,
-              overflow: 'auto',
-              color: '#374151',
-              lineHeight: 1.6,
-            }}
-          >
-            {task.mediaArticle.text}
-          </Box>
-
-          {task.result && task.status === 'done' && (
-            <Box sx={{ mt: 2, p: 2, background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', borderRadius: 2 }}>
-              <Typography variant="caption" sx={{ color: '#16a34a', fontWeight: 600 }}>
-                ✓ Translations completed: {task.result.translations.length}
-              </Typography>
-            </Box>
-          )}
-        </Collapse>
       </CardContent>
     </Card>
   );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Grid,
   Paper,
@@ -18,6 +18,7 @@ import {
   Error as FailedIcon,
 } from '@mui/icons-material';
 import TaskCard from './TaskCard';
+import TaskDetailsModal from './TaskDetailsModal';
 import { TranslationTask } from '../../types';
 
 interface KanbanBoardProps {
@@ -71,8 +72,21 @@ const statusColumns = [
 ];
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
+  const [selectedTask, setSelectedTask] = useState<TranslationTask | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const getTasksByStatus = (status: string) => {
     return tasks.filter(task => task.status === status);
+  };
+
+  const handleTaskClick = (task: TranslationTask) => {
+    setSelectedTask(task);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedTask(null);
   };
 
   return (
@@ -172,7 +186,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
                     {columnTasks.map((task, taskIndex) => (
                       <Fade in={true} timeout={500 + taskIndex * 100} key={task.id}>
                         <div>
-                          <TaskCard task={task} />
+                          <TaskCard task={task} onClick={() => handleTaskClick(task)} />
                         </div>
                       </Fade>
                     ))}
@@ -198,6 +212,12 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
           );
         })}
       </Grid>
+      
+      <TaskDetailsModal
+        task={selectedTask}
+        open={isModalOpen}
+        onClose={handleCloseModal}
+      />
     </Box>
   );
 };
