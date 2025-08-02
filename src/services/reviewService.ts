@@ -27,7 +27,8 @@ export class ReviewService {
 
   async reviewAgainstGuidelines(
     translatedText: string,
-    guidelines: EditorialGuidelines
+    guidelines: EditorialGuidelines,
+    fullContextText?: string
   ): Promise<{ notes: string[]; score: number }> {
     const isDemoMode = process.env.DEMO_MODE === "true";
 
@@ -45,7 +46,7 @@ export class ReviewService {
     }
 
     try {
-      const prompt = this.buildReviewPrompt(translatedText, guidelines);
+      const prompt = this.buildReviewPrompt(translatedText, guidelines, fullContextText);
       console.log("Prompt:", prompt);
       console.log("Anthropic:", this.anthropic);
 
@@ -74,29 +75,34 @@ export class ReviewService {
 
   private buildReviewPrompt(
     text: string,
-    guidelines: EditorialGuidelines
+    guidelines: EditorialGuidelines,
+    fullContextText?: string
   ): string {
-    let prompt = `Please review the following text against the editorial guidelines provided. Provide specific feedback on compliance and areas for improvement.
+    let prompt = `Please review the following translated text against the editorial guidelines provided. Provide specific feedback on compliance and areas for improvement.
 
 Text to review:
 "${text}"
 
 Editorial Guidelines:`;
 
-    if (guidelines.tone) {
-      prompt += `\n- Tone: ${guidelines.tone}`;
-    }
-    if (guidelines.style) {
-      prompt += `\n- Style: ${guidelines.style}`;
-    }
-    if (guidelines.targetAudience) {
-      prompt += `\n- Target Audience: ${guidelines.targetAudience}`;
-    }
-    if (guidelines.restrictions && guidelines.restrictions.length > 0) {
-      prompt += `\n- Restrictions: ${guidelines.restrictions.join(", ")}`;
-    }
-    if (guidelines.requirements && guidelines.requirements.length > 0) {
-      prompt += `\n- Requirements: ${guidelines.requirements.join(", ")}`;
+    if (fullContextText) {
+      prompt += `\n\n${fullContextText}`;
+    } else {
+      if (guidelines.tone) {
+        prompt += `\n- Tone: ${guidelines.tone}`;
+      }
+      if (guidelines.style) {
+        prompt += `\n- Style: ${guidelines.style}`;
+      }
+      if (guidelines.targetAudience) {
+        prompt += `\n- Target Audience: ${guidelines.targetAudience}`;
+      }
+      if (guidelines.restrictions && guidelines.restrictions.length > 0) {
+        prompt += `\n- Restrictions: ${guidelines.restrictions.join(", ")}`;
+      }
+      if (guidelines.requirements && guidelines.requirements.length > 0) {
+        prompt += `\n- Requirements: ${guidelines.requirements.join(", ")}`;
+      }
     }
 
     prompt += `\n\nPlease provide your review as a numbered list of specific observations, each on a new line starting with a number and period (e.g., "1. The tone is...").

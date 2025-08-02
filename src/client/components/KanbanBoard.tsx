@@ -19,7 +19,7 @@ import {
 } from '@mui/icons-material';
 import TaskCard from './TaskCard';
 import TaskDetailsModal from './TaskDetailsModal';
-import { TranslationTask, hasMultipleLanguageStates, getLanguageStatesForTask } from '../../types';
+import { TranslationTask, hasMultipleLanguageStates, getLanguageStatesForTask, TaskCardDisplayInfo, getTaskDisplayInfoForStatus, LanguageTaskStatus } from '../../types';
 
 interface KanbanBoardProps {
   tasks: TranslationTask[];
@@ -75,19 +75,24 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
   const [selectedTask, setSelectedTask] = useState<TranslationTask | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const getTasksByStatus = (status: string) => {
-    return tasks.filter(task => task.status === status);
+  const getTaskDisplayInfosByStatus = (status: string): TaskCardDisplayInfo[] => {
+    const displayInfos: TaskCardDisplayInfo[] = [];
+    
+    tasks.forEach(task => {
+      const displayInfo = getTaskDisplayInfoForStatus(task, status as LanguageTaskStatus);
+      if (displayInfo) {
+        displayInfos.push(displayInfo);
+      }
+    });
+    
+    return displayInfos;
   };
 
   const getLanguageCountByStatus = (status: string) => {
     let count = 0;
-    tasks.forEach(task => {
-      if (hasMultipleLanguageStates(task)) {
-        const languageStates = getLanguageStatesForTask(task);
-        languageStates.forEach(langStatus => {
-          if (langStatus === status) count++;
-        });
-      }
+    const displayInfos = getTaskDisplayInfosByStatus(status);
+    displayInfos.forEach(info => {
+      count += info.filteredLanguages.length;
     });
     return count;
   };
@@ -121,8 +126,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
       
       <Grid container spacing={3}>
         {statusColumns.map((column, index) => {
-          const columnTasks = getTasksByStatus(column.status);
-          const splitLanguageCount = getLanguageCountByStatus(column.status);
+          const columnDisplayInfos = getTaskDisplayInfosByStatus(column.status);
+          const totalLanguageCount = getLanguageCountByStatus(column.status);
           const IconComponent = column.icon;
           
           return (
@@ -181,7 +186,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
                         {column.title}
                       </Typography>
                       <Chip
-                        label={`${columnTasks.length} tasks`}
+                        label={`${columnDisplayInfos.length} tasks`}
                         size="small"
                         sx={{
                           background: column.gradient,
@@ -194,14 +199,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
                           },
                         }}
                       />
-                      {splitLanguageCount > 0 && (
+                      {totalLanguageCount > columnDisplayInfos.length && (
                         <Chip
-                          label={`+${splitLanguageCount}`}
+                          label={`${totalLanguageCount} langs`}
                           size="small"
                           sx={{
-                            backgroundColor: '#ff5722',
+                            backgroundColor: '#2196f3',
                             color: 'white',
                             fontSize: '0.7rem',
+                            ml: 0.5,
                           }}
                         />
                       )}
@@ -209,14 +215,20 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
                   </Box>
                   
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {columnTasks.map((task, taskIndex) => (
-                      <Fade in={true} timeout={500 + taskIndex * 100} key={task.id}>
+                    {columnDisplayInfos.map((displayInfo, taskIndex) => (
+                      <Fade in={true} timeout={500 + taskIndex * 100} key={`${displayInfo.task.id}-${column.status}`}>
                         <div>
-                          <TaskCard task={task} onClick={() => handleTaskClick(task)} />
+                          <TaskCard 
+                            task={displayInfo.task} 
+                            filteredLanguages={displayInfo.filteredLanguages}
+                            isPartialDisplay={displayInfo.isPartialDisplay}
+                            currentColumnStatus={column.status as LanguageTaskStatus}
+                            onClick={() => handleTaskClick(displayInfo.task)} 
+                          />
                         </div>
                       </Fade>
                     ))}
-                    {columnTasks.length === 0 && (
+                    {columnDisplayInfos.length === 0 && (
                       <Box
                         sx={{
                           display: 'flex',

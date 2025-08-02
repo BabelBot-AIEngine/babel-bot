@@ -34,7 +34,8 @@ export class TaskService {
     mediaArticle: MediaArticle,
     editorialGuidelines: EditorialGuidelines,
     destinationLanguages: string[],
-    guide?: GuideType
+    guide?: GuideType,
+    useFullMarkdown?: boolean
   ): Promise<string> {
     const taskId = await this.dbService.createTask({
       status: "pending",
@@ -43,6 +44,7 @@ export class TaskService {
       destinationLanguages,
       progress: 0,
       guide,
+      useFullMarkdown,
     });
 
     this.processTaskAsync(taskId);
@@ -67,7 +69,8 @@ export class TaskService {
         task.mediaArticle,
         task.editorialGuidelines,
         task.destinationLanguages,
-        task.guide
+        task.guide,
+        task.useFullMarkdown
       );
 
       await this.dbService.updateTask(taskId, {

@@ -13,16 +13,22 @@ import {
   Error as ErrorIcon,
 } from '@mui/icons-material';
 import { TranslationTask, getLanguageStatesForTask, hasMultipleLanguageStates, LanguageTaskStatus } from '../../types';
+import { getLanguageDisplayName } from '../../utils/languageUtils';
 
 interface TaskCardProps {
   task: TranslationTask;
   onClick: () => void;
+  filteredLanguages?: string[];
+  isPartialDisplay?: boolean;
+  currentColumnStatus?: LanguageTaskStatus;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, filteredLanguages, isPartialDisplay = false, currentColumnStatus }) => {
+
+  const displayStatus = currentColumnStatus || task.status;
 
   const getStatusIcon = () => {
-    switch (task.status) {
+    switch (displayStatus) {
       case 'failed':
         return <ErrorIcon color="error" fontSize="small" />;
       case 'translating':
@@ -54,9 +60,10 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
 
   const languageStates = getLanguageStatesForTask(task);
   const hasSplitStates = hasMultipleLanguageStates(task);
+  const displayLanguages = filteredLanguages || task.destinationLanguages;
 
   const getStatusGradient = () => {
-    switch (task.status) {
+    switch (displayStatus) {
       case 'pending':
         return 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)';
       case 'translating':
@@ -132,9 +139,9 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
             }}
           >
             {task.id.split('_')[1]}
-            {hasSplitStates && (
+            {isPartialDisplay && (
               <Chip
-                label="SPLIT"
+                label="PARTIAL"
                 size="small"
                 sx={{
                   ml: 1,
@@ -176,25 +183,26 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
         >
           {task.mediaArticle.title || task.mediaArticle.text.substring(0, 60) + '...'}
         </Typography>
-        {task.result && (
+        {task.result && isPartialDisplay && (
             <Box sx={{ mt: 1 }}>
               <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
-                <strong>Translations:</strong> {task.result.translations.length}
+                <strong>Languages in {displayStatus}:</strong> {displayLanguages.length}
               </Typography>
-              {hasSplitStates && (
-                <Box sx={{ mt: 1 }}>
-                  {task.result.translations.map((translation, index) => (
+              <Box sx={{ mt: 1 }}>
+                {task.result.translations
+                  .filter(translation => displayLanguages.includes(translation.language))
+                  .map((translation, index) => (
                     <Box key={index} sx={{ mb: 1, p: 1, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
                       <Typography variant="caption" sx={{ display: 'block' }}>
-                        <strong>{translation.language}:</strong>
+                        <strong>{getLanguageDisplayName(translation.language)}:</strong>
                         <Chip
-                          label={translation.status || 'done'}
+                          label={translation.status || displayStatus}
                           size="small"
                           sx={{
                             ml: 1,
                             height: 16,
                             fontSize: '0.6rem',
-                            backgroundColor: getLanguageStatusColor(translation.status || 'done'),
+                            backgroundColor: getLanguageStatusColor(translation.status || displayStatus),
                             color: 'white',
                           }}
                         />
@@ -206,24 +214,30 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
                       )}
                     </Box>
                   ))}
-                </Box>
-              )}
+              </Box>
+            </Box>
+          )}
+          {task.result && !isPartialDisplay && (
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
+                <strong>Translations:</strong> {task.result.translations.length}
+              </Typography>
             </Box>
           )}
         
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-          {task.destinationLanguages.slice(0, 3).map(lang => {
-            const langStatus = languageStates.get(lang) || 'pending';
+          {displayLanguages.slice(0, 3).map(lang => {
+            const langStatus = languageStates.get(lang) || displayStatus;
             const statusColor = getLanguageStatusColor(langStatus);
             return (
               <Chip
                 key={lang}
-                label={lang}
+                label={getLanguageDisplayName(lang)}
                 size="small"
-                variant={hasSplitStates ? "filled" : "outlined"}
+                variant={isPartialDisplay ? "filled" : "outlined"}
                 sx={{ 
                   fontSize: '0.7rem',
-                  ...(hasSplitStates && {
+                  ...(isPartialDisplay && {
                     backgroundColor: statusColor,
                     color: 'white',
                     '&:hover': {
@@ -235,9 +249,9 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
               />
             );
           })}
-          {task.destinationLanguages.length > 3 && (
+          {displayLanguages.length > 3 && (
             <Chip
-              label={`+${task.destinationLanguages.length - 3}`}
+              label={`+${displayLanguages.length - 3}`}
               size="small"
               sx={{ 
                 fontSize: '0.7rem',
@@ -249,7 +263,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
           )}
         </Box>
 
-        {(task.status === 'translating' || task.status === 'llm_verification' || task.status === 'human_review') && (
+        {(displayStatus === 'translating' || displayStatus === 'llm_verification' || displayStatus === 'human_review') && (
           <Box sx={{ mb: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>

@@ -24,6 +24,7 @@ export interface TranslationTask {
   progress?: number;
   guide?: GuideType;
   humanReviewBatches?: HumanReviewBatch[];
+  useFullMarkdown?: boolean;
 }
 
 export class DatabaseService {

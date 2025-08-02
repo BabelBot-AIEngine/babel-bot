@@ -30,28 +30,84 @@ export class TranslationService {
     }
   }
 
+  async getAvailableLanguages(): Promise<Array<{ code: string; name: string }>> {
+    this.setup();
+    const isDemoMode = process.env.DEMO_MODE === "true";
+
+    if (isDemoMode) {
+      // In demo mode, simulate actual DeepL supported languages with proper codes
+      return [
+        { code: 'BG', name: 'Bulgarian' },
+        { code: 'CS', name: 'Czech' },
+        { code: 'DA', name: 'Danish' },
+        { code: 'DE', name: 'German' },
+        { code: 'EL', name: 'Greek' },
+        { code: 'EN-GB', name: 'English (British)' },
+        { code: 'EN-US', name: 'English (American)' },
+        { code: 'ES', name: 'Spanish' },
+        { code: 'ET', name: 'Estonian' },
+        { code: 'FI', name: 'Finnish' },
+        { code: 'FR', name: 'French' },
+        { code: 'HU', name: 'Hungarian' },
+        { code: 'ID', name: 'Indonesian' },
+        { code: 'IT', name: 'Italian' },
+        { code: 'JA', name: 'Japanese' },
+        { code: 'KO', name: 'Korean' },
+        { code: 'LT', name: 'Lithuanian' },
+        { code: 'LV', name: 'Latvian' },
+        { code: 'NB', name: 'Norwegian (Bokmål)' },
+        { code: 'NL', name: 'Dutch' },
+        { code: 'PL', name: 'Polish' },
+        { code: 'PT-BR', name: 'Portuguese (Brazilian)' },
+        { code: 'PT-PT', name: 'Portuguese (European)' },
+        { code: 'RO', name: 'Romanian' },
+        { code: 'RU', name: 'Russian' },
+        { code: 'SK', name: 'Slovak' },
+        { code: 'SL', name: 'Slovenian' },
+        { code: 'SV', name: 'Swedish' },
+        { code: 'TR', name: 'Turkish' },
+        { code: 'UK', name: 'Ukrainian' },
+        { code: 'ZH', name: 'Chinese (Simplified)' }
+      ];
+    }
+
+    if (!this.translator) {
+      throw new Error("DeepL translator not initialized");
+    }
+
+    const languages = await this.translator.getTargetLanguages();
+    return languages.map(lang => ({
+      code: lang.code,
+      name: lang.name
+    }));
+  }
+
   async translateArticle(
     article: MediaArticle,
     guidelines: EditorialGuidelines,
     destinationLanguages: string[],
-    guide?: GuideType
+    guide?: GuideType,
+    useFullMarkdown?: boolean
   ): Promise<TranslationResult[]> {
     const results: TranslationResult[] = [];
     this.setup();
 
-    const effectiveGuidelines = await this.loadGuidelinesByType(
+    const { effectiveGuidelines, contextText } = await this.loadGuidelinesByType(
       guide || "financialtimes",
-      guidelines
+      guidelines,
+      useFullMarkdown
     );
 
     for (const language of destinationLanguages) {
       const translatedText = await this.performTranslation(
         article.text,
-        language
+        language,
+        contextText
       );
       const reviewResult = await this.reviewService.reviewAgainstGuidelines(
         translatedText,
-        effectiveGuidelines
+        effectiveGuidelines,
+        contextText
       );
       const complianceScore = reviewResult.score;
 
@@ -68,24 +124,89 @@ export class TranslationService {
 
   private async loadGuidelinesByType(
     guide: GuideType,
-    fallbackGuidelines: EditorialGuidelines
-  ): Promise<EditorialGuidelines> {
+    fallbackGuidelines: EditorialGuidelines,
+    useFullMarkdown?: boolean
+  ): Promise<{ effectiveGuidelines: EditorialGuidelines; contextText: string }> {
     try {
+      const fileExtension = useFullMarkdown ? "md" : "txt";
       const guidelinePath = path.join(
         process.cwd(),
         "editorial",
         "guidelines",
-        `${guide}.md`
+        `${guide}.${fileExtension}`
       );
-      const markdownContent = fs.readFileSync(guidelinePath, "utf-8");
+      
+      let fileContent: string;
+      try {
+        fileContent = fs.readFileSync(guidelinePath, "utf-8");
+      } catch (error) {
+        const fallbackExtension = useFullMarkdown ? "txt" : "md";
+        const fallbackPath = path.join(
+          process.cwd(),
+          "editorial",
+          "guidelines",
+          `${guide}.${fallbackExtension}`
+        );
+        fileContent = fs.readFileSync(fallbackPath, "utf-8");
+      }
 
-      return this.parseMarkdownGuidelines(markdownContent, fallbackGuidelines);
+      let effectiveGuidelines: EditorialGuidelines;
+      if (useFullMarkdown) {
+        effectiveGuidelines = this.parseMarkdownGuidelines(fileContent, fallbackGuidelines);
+      } else {
+        effectiveGuidelines = { ...fallbackGuidelines };
+      }
+
+      let contextText = fileContent;
+      
+      const hasOverrides = Object.keys(fallbackGuidelines).some(
+        key => fallbackGuidelines[key as keyof EditorialGuidelines] !== undefined
+      );
+      
+      if (hasOverrides) {
+        contextText += "\n\n--- EDITORIAL OVERRIDES ---\n\n";
+        if (fallbackGuidelines.tone) {
+          contextText += `Tone Override: ${fallbackGuidelines.tone}\n`;
+        }
+        if (fallbackGuidelines.style) {
+          contextText += `Style Override: ${fallbackGuidelines.style}\n`;
+        }
+        if (fallbackGuidelines.targetAudience) {
+          contextText += `Target Audience Override: ${fallbackGuidelines.targetAudience}\n`;
+        }
+        if (fallbackGuidelines.restrictions?.length) {
+          contextText += `Restrictions Override: ${fallbackGuidelines.restrictions.join(", ")}\n`;
+        }
+        if (fallbackGuidelines.requirements?.length) {
+          contextText += `Requirements Override: ${fallbackGuidelines.requirements.join(", ")}\n`;
+        }
+      }
+
+      return { effectiveGuidelines, contextText };
     } catch (error) {
       console.warn(
         `Could not load guidelines for ${guide}, using fallback:`,
         error
       );
-      return fallbackGuidelines;
+      
+      let contextText = "Using fallback editorial guidelines.\n\n";
+      if (fallbackGuidelines.tone) {
+        contextText += `Tone: ${fallbackGuidelines.tone}\n`;
+      }
+      if (fallbackGuidelines.style) {
+        contextText += `Style: ${fallbackGuidelines.style}\n`;
+      }
+      if (fallbackGuidelines.targetAudience) {
+        contextText += `Target Audience: ${fallbackGuidelines.targetAudience}\n`;
+      }
+      if (fallbackGuidelines.restrictions?.length) {
+        contextText += `Restrictions: ${fallbackGuidelines.restrictions.join(", ")}\n`;
+      }
+      if (fallbackGuidelines.requirements?.length) {
+        contextText += `Requirements: ${fallbackGuidelines.requirements.join(", ")}\n`;
+      }
+      
+      return { effectiveGuidelines: fallbackGuidelines, contextText };
     }
   }
 
@@ -141,7 +262,8 @@ export class TranslationService {
 
   private async performTranslation(
     text: string,
-    language: string
+    language: string,
+    context?: string
   ): Promise<string> {
     const isDemoMode = process.env.DEMO_MODE === "true";
 
@@ -151,10 +273,15 @@ export class TranslationService {
     }
 
     try {
+      const translateOptions: any = {
+        context: context || undefined
+      };
+      
       const result = await this.translator?.translateText(
         text,
         null,
-        language as deepl.TargetLanguageCode
+        language as deepl.TargetLanguageCode,
+        translateOptions
       );
       return result?.text || "";
     } catch (error) {
