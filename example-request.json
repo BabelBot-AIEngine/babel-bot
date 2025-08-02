@@ -1,0 +1,14 @@
+{
+  "mediaArticle": {
+    "text": "Breaking news: Scientists have discovered a new species of marine life in the deep ocean. This remarkable creature has unique characteristics that could revolutionize our understanding of marine biology.",
+    "title": "New Marine Species Discovery"
+  },
+  "editorialGuidelines": {
+    "tone": "professional",
+    "style": "journalistic",
+    "targetAudience": "general public",
+    "restrictions": ["no technical jargon", "keep sentences under 20 words"],
+    "requirements": ["include scientific accuracy", "maintain engaging tone"]
+  },
+  "destinationLanguages": ["es", "fr", "de"]
+}
