@@ -49,7 +49,7 @@ export class TranslationService {
 
   private async loadGuidelinesByType(guide: GuideType, fallbackGuidelines: EditorialGuidelines): Promise<EditorialGuidelines> {
     try {
-      const guidelinePath = path.join(process.cwd(), 'babel-bot', 'editorial', 'guidelines', `${guide}.md`);
+      const guidelinePath = path.join(process.cwd(), 'editorial', 'guidelines', `${guide}.md`);
       const markdownContent = fs.readFileSync(guidelinePath, 'utf-8');
       
       return this.parseMarkdownGuidelines(markdownContent, fallbackGuidelines);
