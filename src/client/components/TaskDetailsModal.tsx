@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   Typography,
@@ -11,6 +10,15 @@ import {
   IconButton,
   Divider,
   Button,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Card,
+  CardContent,
+  Rating,
+  Tabs,
+  Tab,
+  Grid,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -24,6 +32,13 @@ import {
   Person as ReviewIcon,
   CheckCircle as DoneIcon,
   Error as FailedIcon,
+  ExpandMore as ExpandMoreIcon,
+  Article as ArticleIcon,
+  Gavel as GuidelinesIcon,
+  Score as ScoreIcon,
+  ContentCopy as CopyIcon,
+  Star as StarIcon,
+  StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
 import { TranslationTask } from '../../types';
 
@@ -33,11 +48,47 @@ interface TaskDetailsModalProps {
   onClose: () => void;
 }
 
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`modal-tabpanel-${index}`}
+      aria-labelledby={`modal-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ py: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
 const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose }) => {
+  const [tabValue, setTabValue] = useState(0);
+
   if (!task) return null;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
+  };
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
   };
 
   const getStatusIcon = () => {
@@ -116,11 +167,23 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
     }
   };
 
+  const getComplianceRating = (score?: number) => {
+    if (!score) return 0;
+    return score / 20; // Convert 0-100 to 0-5 scale
+  };
+
+  const getComplianceColor = (score?: number) => {
+    if (!score) return '#9ca3af';
+    if (score >= 80) return '#10b981';
+    if (score >= 60) return '#f59e0b';
+    return '#ef4444';
+  };
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="xl"
       fullWidth
       PaperProps={{
         sx: {
@@ -128,7 +191,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
           background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.2)',
-          maxHeight: '90vh',
+          maxHeight: '95vh',
+          minHeight: '80vh',
         }
       }}
       BackdropProps={{
@@ -170,16 +234,21 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
               Task #{task.id.split('_')[1]}
             </Typography>
-            <Chip
-              label={getStatusTitle()}
-              size="small"
-              sx={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                fontWeight: 600,
-                backdropFilter: 'blur(10px)',
-              }}
-            />
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <Chip
+                label={getStatusTitle()}
+                size="small"
+                sx={{
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  color: 'white',
+                  fontWeight: 600,
+                  backdropFilter: 'blur(10px)',
+                }}
+              />
+              <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                Created {formatDate(task.createdAt)}
+              </Typography>
+            </Box>
           </Box>
           <IconButton
             onClick={onClose}
@@ -203,181 +272,425 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
         )}
       </Box>
 
-      <DialogContent sx={{ p: 4 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          
-          {/* Progress Section */}
-          {(task.status === 'translating' || task.status === 'llm_verification' || task.status === 'human_review') && (
-            <Box
-              sx={{
-                p: 3,
-                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                border: '1px solid #e2e8f0',
-                borderRadius: 2,
-              }}
-            >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600 }}>
-                  Progress
-                </Typography>
-                <Typography variant="h6" sx={{ color: getStatusColor(), fontWeight: 700 }}>
-                  {task.progress || 0}%
-                </Typography>
-              </Box>
-              <LinearProgress
-                variant="determinate"
-                value={task.progress || 0}
-                sx={{ 
-                  height: 8, 
-                  borderRadius: 4,
-                  background: 'rgba(0, 0, 0, 0.06)',
-                  '& .MuiLinearProgress-bar': {
-                    background: getStatusGradient(),
-                    borderRadius: 4,
-                  },
-                }}
-              />
-            </Box>
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', background: 'rgba(248, 250, 252, 0.8)' }}>
+        <Tabs 
+          value={tabValue} 
+          onChange={handleTabChange} 
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            px: 3,
+            '& .MuiTab-root': {
+              fontWeight: 600,
+              textTransform: 'none',
+            },
+          }}
+        >
+          <Tab 
+            label="Overview" 
+            icon={<ArticleIcon />} 
+            iconPosition="start"
+            sx={{ minHeight: 60 }}
+          />
+          <Tab 
+            label="Editorial Guidelines" 
+            icon={<GuidelinesIcon />} 
+            iconPosition="start"
+            sx={{ minHeight: 60 }}
+          />
+          {task.result && (
+            <Tab 
+              label={`Translations (${task.result.translations.length})`}
+              icon={<TranslatingIcon />} 
+              iconPosition="start"
+              sx={{ minHeight: 60 }}
+            />
           )}
+        </Tabs>
+      </Box>
 
-          {/* Error Section */}
-          {task.error && (
-            <Box
-              sx={{
-                p: 3,
-                background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-                border: '1px solid #fecaca',
-                borderRadius: 2,
-              }}
-            >
-              <Typography
-                variant="h6"
-                sx={{ 
-                  color: '#dc2626',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  mb: 1,
-                }}
-              >
-                <ErrorIcon sx={{ fontSize: 20, mr: 1 }} />
-                Error Details
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#7f1d1d' }}>
-                {task.error}
-              </Typography>
-            </Box>
-          )}
+      <DialogContent sx={{ p: 0, minHeight: '400px' }}>
+        {/* Overview Tab */}
+        <TabPanel value={tabValue} index={0}>
+          <Box sx={{ px: 4 }}>
+            <Grid container spacing={4}>
+              {/* Progress Section */}
+              {(task.status === 'translating' || task.status === 'llm_verification' || task.status === 'human_review') && (
+                <Grid item xs={12}>
+                  <Card
+                    sx={{
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 2,
+                    }}
+                  >
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600 }}>
+                          Progress
+                        </Typography>
+                        <Typography variant="h6" sx={{ color: getStatusColor(), fontWeight: 700 }}>
+                          {task.progress || 0}%
+                        </Typography>
+                      </Box>
+                      <LinearProgress
+                        variant="determinate"
+                        value={task.progress || 0}
+                        sx={{ 
+                          height: 8, 
+                          borderRadius: 4,
+                          background: 'rgba(0, 0, 0, 0.06)',
+                          '& .MuiLinearProgress-bar': {
+                            background: getStatusGradient(),
+                            borderRadius: 4,
+                          },
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
 
-          {/* Languages Section */}
-          <Box>
-            <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 2 }}>
-              Destination Languages
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {task.destinationLanguages.map(lang => (
-                <Chip
-                  key={lang}
-                  label={lang}
-                  sx={{ 
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    background: getStatusGradient(),
-                    color: 'white',
-                    '&:hover': {
-                      transform: 'scale(1.05)',
-                    },
-                    transition: 'transform 0.2s ease',
-                  }}
-                />
-              ))}
-            </Box>
+              {/* Error Section */}
+              {task.error && (
+                <Grid item xs={12}>
+                  <Card
+                    sx={{
+                      background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                      border: '1px solid #fecaca',
+                      borderRadius: 2,
+                    }}
+                  >
+                    <CardContent>
+                      <Typography
+                        variant="h6"
+                        sx={{ 
+                          color: '#dc2626',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          mb: 1,
+                        }}
+                      >
+                        <ErrorIcon sx={{ fontSize: 20, mr: 1 }} />
+                        Error Details
+                      </Typography>
+                      <Typography variant="body1" sx={{ color: '#7f1d1d' }}>
+                        {task.error}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
+
+              {/* Languages and Timeline */}
+              <Grid item xs={12} md={6}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 2 }}>
+                      Target Languages
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {task.destinationLanguages.map(lang => (
+                        <Chip
+                          key={lang}
+                          label={lang}
+                          sx={{ 
+                            fontSize: '0.875rem',
+                            fontWeight: 600,
+                            background: getStatusGradient(),
+                            color: 'white',
+                            '&:hover': {
+                              transform: 'scale(1.05)',
+                            },
+                            transition: 'transform 0.2s ease',
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent>
+                    <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 2 }}>
+                      Timeline
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 0.5 }}>
+                          Created
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>
+                          {formatDate(task.createdAt)}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 0.5 }}>
+                          Last Updated
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>
+                          {formatDate(task.updatedAt)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Original Article */}
+              <Grid item xs={12}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600 }}>
+                        Original Article
+                      </Typography>
+                      <IconButton
+                        onClick={() => copyToClipboard(task.mediaArticle.text)}
+                        sx={{
+                          background: 'rgba(99, 102, 241, 0.1)',
+                          '&:hover': {
+                            background: 'rgba(99, 102, 241, 0.2)',
+                          },
+                        }}
+                      >
+                        <CopyIcon sx={{ color: '#6366f1' }} />
+                      </IconButton>
+                    </Box>
+                    <Box
+                      sx={{
+                        p: 3,
+                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: 2,
+                        maxHeight: 400,
+                        overflow: 'auto',
+                      }}
+                    >
+                      <Typography 
+                        variant="body1" 
+                        sx={{ 
+                          color: '#374151',
+                          lineHeight: 1.7,
+                          whiteSpace: 'pre-wrap',
+                        }}
+                      >
+                        {task.mediaArticle.text}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
           </Box>
+        </TabPanel>
 
-          {/* Timestamps Section */}
-          <Box>
-            <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 2 }}>
-              Timeline
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 4 }}>
-              <Box>
-                <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 0.5 }}>
-                  Created
+        {/* Editorial Guidelines Tab */}
+        <TabPanel value={tabValue} index={1}>
+          <Box sx={{ px: 4 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 3 }}>
+                  Editorial Guidelines Applied
                 </Typography>
-                <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>
-                  {formatDate(task.createdAt)}
-                </Typography>
+                
+                <Grid container spacing={3}>
+                  {task.editorialGuidelines.tone && (
+                    <Grid item xs={12} md={4}>
+                      <Box
+                        sx={{
+                          p: 3,
+                          background: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
+                          border: '1px solid #c4b5fd',
+                          borderRadius: 2,
+                        }}
+                      >
+                        <Typography variant="subtitle1" sx={{ color: '#6b46c1', fontWeight: 600, mb: 1 }}>
+                          Tone
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: '#4c1d95' }}>
+                          {task.editorialGuidelines.tone}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+
+                  {task.editorialGuidelines.style && (
+                    <Grid item xs={12} md={4}>
+                      <Box
+                        sx={{
+                          p: 3,
+                          background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                          border: '1px solid #93c5fd',
+                          borderRadius: 2,
+                        }}
+                      >
+                        <Typography variant="subtitle1" sx={{ color: '#1d4ed8', fontWeight: 600, mb: 1 }}>
+                          Style
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: '#1e3a8a' }}>
+                          {task.editorialGuidelines.style}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+
+                  {task.editorialGuidelines.targetAudience && (
+                    <Grid item xs={12} md={4}>
+                      <Box
+                        sx={{
+                          p: 3,
+                          background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                          border: '1px solid #6ee7b7',
+                          borderRadius: 2,
+                        }}
+                      >
+                        <Typography variant="subtitle1" sx={{ color: '#047857', fontWeight: 600, mb: 1 }}>
+                          Target Audience
+                        </Typography>
+                        <Typography variant="body1" sx={{ color: '#064e3b' }}>
+                          {task.editorialGuidelines.targetAudience}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+
+                  {(!task.editorialGuidelines.tone && !task.editorialGuidelines.style && !task.editorialGuidelines.targetAudience) && (
+                    <Grid item xs={12}>
+                      <Box
+                        sx={{
+                          p: 4,
+                          background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: 2,
+                          textAlign: 'center',
+                        }}
+                      >
+                        <Typography variant="body1" sx={{ color: '#6b7280', fontStyle: 'italic' }}>
+                          No specific editorial guidelines were provided for this translation task.
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
+              </CardContent>
+            </Card>
+          </Box>
+        </TabPanel>
+
+        {/* Translations Tab */}
+        {task.result && (
+          <TabPanel value={tabValue} index={2}>
+            <Box sx={{ px: 4 }}>
+              <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 3 }}>
+                Translation Results
+              </Typography>
+              
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {task.result.translations.map((translation, index) => (
+                  <Card key={index} sx={{ overflow: 'visible' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Chip
+                            label={translation.language}
+                            sx={{
+                              background: getStatusGradient(),
+                              color: 'white',
+                              fontWeight: 600,
+                              fontSize: '0.875rem',
+                            }}
+                          />
+                          {translation.complianceScore && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <ScoreIcon sx={{ color: getComplianceColor(translation.complianceScore), fontSize: 20 }} />
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: getComplianceColor(translation.complianceScore) }}>
+                                Compliance: {translation.complianceScore}%
+                              </Typography>
+                              <Rating
+                                value={getComplianceRating(translation.complianceScore)}
+                                readOnly
+                                size="small"
+                                sx={{
+                                  '& .MuiRating-iconFilled': {
+                                    color: getComplianceColor(translation.complianceScore),
+                                  },
+                                }}
+                              />
+                            </Box>
+                          )}
+                        </Box>
+                        <IconButton
+                          onClick={() => copyToClipboard(translation.translatedText)}
+                          sx={{
+                            background: 'rgba(99, 102, 241, 0.1)',
+                            '&:hover': {
+                              background: 'rgba(99, 102, 241, 0.2)',
+                            },
+                          }}
+                        >
+                          <CopyIcon sx={{ color: '#6366f1' }} />
+                        </IconButton>
+                      </Box>
+
+                      <Box
+                        sx={{
+                          p: 3,
+                          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 2,
+                          mb: 2,
+                        }}
+                      >
+                        <Typography 
+                          variant="body1" 
+                          sx={{ 
+                            color: '#374151',
+                            lineHeight: 1.7,
+                            whiteSpace: 'pre-wrap',
+                          }}
+                        >
+                          {translation.translatedText}
+                        </Typography>
+                      </Box>
+
+                      {translation.reviewNotes && translation.reviewNotes.length > 0 && (
+                        <Accordion sx={{ boxShadow: 'none', border: '1px solid #e2e8f0' }}>
+                          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                              Review Notes ({translation.reviewNotes.length})
+                            </Typography>
+                          </AccordionSummary>
+                          <AccordionDetails>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              {translation.reviewNotes.map((note, noteIndex) => (
+                                <Typography key={noteIndex} variant="body2" sx={{ color: '#64748b' }}>
+                                  • {note}
+                                </Typography>
+                              ))}
+                            </Box>
+                          </AccordionDetails>
+                        </Accordion>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
               </Box>
-              <Box>
-                <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 0.5 }}>
-                  Last Updated
-                </Typography>
-                <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>
-                  {formatDate(task.updatedAt)}
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
 
-          <Divider sx={{ background: 'rgba(0, 0, 0, 0.06)' }} />
-
-          {/* Article Content Section */}
-          <Box>
-            <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 2 }}>
-              Article Content
-            </Typography>
-            <Box
-              sx={{
-                p: 3,
-                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                border: '1px solid #e2e8f0',
-                borderRadius: 2,
-                maxHeight: 300,
-                overflow: 'auto',
-              }}
-            >
-              <Typography 
-                variant="body1" 
-                sx={{ 
-                  color: '#374151',
-                  lineHeight: 1.7,
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {task.mediaArticle.text}
-              </Typography>
+              {task.result.processedAt && (
+                <Box sx={{ mt: 3, p: 2, background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', borderRadius: 2 }}>
+                  <Typography variant="body2" sx={{ color: '#16a34a', fontWeight: 600, textAlign: 'center' }}>
+                    ✓ Processing completed on {formatDate(task.result.processedAt)}
+                  </Typography>
+                </Box>
+              )}
             </Box>
-          </Box>
-
-          {/* Results Section */}
-          {task.result && task.status === 'done' && (
-            <Box
-              sx={{
-                p: 3,
-                background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                border: '1px solid #bbf7d0',
-                borderRadius: 2,
-              }}
-            >
-              <Typography
-                variant="h6"
-                sx={{ 
-                  color: '#16a34a',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  mb: 1,
-                }}
-              >
-                <CheckCircleIcon sx={{ fontSize: 20, mr: 1 }} />
-                Translation Complete
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#15803d' }}>
-                Successfully completed {task.result.translations.length} translation(s)
-              </Typography>
-            </Box>
-          )}
-        </Box>
+          </TabPanel>
+        )}
       </DialogContent>
 
       <DialogActions sx={{ p: 4, pt: 0 }}>
