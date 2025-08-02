@@ -1,5 +1,6 @@
 import { DatabaseService, TranslationTask } from "../database/dbService";
 import { TranslationService } from "./translationService";
+import { ReviewService } from "./reviewService";
 import {
   MediaArticle,
   EditorialGuidelines,
@@ -10,10 +11,12 @@ import {
 export class TaskService {
   private dbService: DatabaseService;
   private translationService: TranslationService;
+  private reviewService: ReviewService;
 
   constructor() {
     this.dbService = new DatabaseService();
     this.translationService = new TranslationService();
+    this.reviewService = new ReviewService();
   }
 
   async createTranslationTask(
@@ -63,8 +66,11 @@ export class TaskService {
 
       await this.sleep(1500);
 
-      const verifiedTranslations = await this.verifyTranslations(translations);
-      
+      const verifiedTranslations = await this.verifyTranslations(
+        translations,
+        task.editorialGuidelines
+      );
+
       const result: TranslationResponse = {
         originalArticle: task.mediaArticle,
         translations: verifiedTranslations,
@@ -72,7 +78,7 @@ export class TaskService {
       };
 
       const taskStatus = this.determineOverallTaskStatus(verifiedTranslations);
-      const progress = taskStatus === 'done' ? 100 : 80;
+      const progress = taskStatus === "done" ? 100 : 80;
 
       await this.dbService.updateTask(taskId, {
         status: taskStatus,
@@ -80,7 +86,7 @@ export class TaskService {
         result,
       });
 
-      if (taskStatus === 'human_review') {
+      if (taskStatus === "human_review") {
         await this.sleep(2000);
         await this.processHumanReview(taskId, verifiedTranslations);
       }
@@ -93,34 +99,61 @@ export class TaskService {
     }
   }
 
-  private async verifyTranslations(translations: any[]): Promise<any[]> {
-    return translations.map((translation) => {
-      const complianceScore = Math.floor(Math.random() * 40) + 60;
-      const status = complianceScore >= 70 ? 'done' : 'human_review';
-      
-      return {
+  private async verifyTranslations(
+    translations: any[],
+    guidelines: EditorialGuidelines
+  ): Promise<any[]> {
+    const verifiedTranslations = [];
+
+    for (const translation of translations) {
+      // Call reviewAgainstGuidelines for verification
+      const reviewResult = await this.reviewService.reviewAgainstGuidelines(
+        translation.translatedText,
+        guidelines
+      );
+
+      const complianceScore = reviewResult.score;
+      const status = complianceScore >= 70 ? "done" : "human_review";
+
+      verifiedTranslations.push({
         ...translation,
-        reviewNotes: ["LLM verification completed", status === 'done' ? "Quality check passed" : "Needs human review"],
+        // Use the fresh review notes from verification
+        reviewNotes: [
+          ...reviewResult.notes,
+          "LLM verification completed",
+          status === "done" ? "Quality check passed" : "Needs human review",
+        ],
         complianceScore,
         status,
-      };
-    });
+      });
+    }
+
+    return verifiedTranslations;
   }
 
-  private determineOverallTaskStatus(translations: any[]): 'done' | 'human_review' {
-    const hasHumanReview = translations.some(t => t.status === 'human_review');
-    return hasHumanReview ? 'human_review' : 'done';
+  private determineOverallTaskStatus(
+    translations: any[]
+  ): "done" | "human_review" {
+    const hasHumanReview = translations.some(
+      (t) => t.status === "human_review"
+    );
+    return hasHumanReview ? "human_review" : "done";
   }
 
-  private async processHumanReview(taskId: string, translations: any[]): Promise<void> {
-    const updatedTranslations = translations.map(translation => {
-      if (translation.status === 'human_review') {
+  private async processHumanReview(
+    taskId: string,
+    translations: any[]
+  ): Promise<void> {
+    const updatedTranslations = translations.map((translation) => {
+      if (translation.status === "human_review") {
         const approved = Math.random() > 0.3;
         return {
           ...translation,
-          status: approved ? 'done' : 'failed',
-          reviewNotes: [...(translation.reviewNotes || []), 
-            approved ? 'Human review approved' : 'Human review rejected']
+          status: approved ? "done" : "failed",
+          reviewNotes: [
+            ...(translation.reviewNotes || []),
+            approved ? "Human review approved" : "Human review rejected",
+          ],
         };
       }
       return translation;
@@ -129,14 +162,14 @@ export class TaskService {
     const task = await this.dbService.getTask(taskId);
     if (task?.result) {
       const finalStatus = this.determineOverallTaskStatus(updatedTranslations);
-      
+
       await this.dbService.updateTask(taskId, {
         status: finalStatus,
         progress: 100,
         result: {
           ...task.result,
-          translations: updatedTranslations
-        }
+          translations: updatedTranslations,
+        },
       });
     }
   }
