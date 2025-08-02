@@ -54,6 +54,7 @@ export interface HumanReviewBatch {
   batchId: string;
   studyId: string;
   datasetId: string;
+  projectId: string;
   createdAt: string;
 }
 

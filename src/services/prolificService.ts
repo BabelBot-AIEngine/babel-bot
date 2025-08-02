@@ -13,6 +13,8 @@ import {
   BatchInstructions,
   CreateWorkspaceRequest,
   Workspace,
+  CreateProjectRequest,
+  Project,
 } from "../types/prolific";
 
 export class ProlificService {
@@ -122,7 +124,13 @@ export class ProlificService {
   }
 
   async getAllWorkspaces(): Promise<Workspace[]> {
-    return this.makeRequest("/workspaces");
+    try {
+      const response = await this.makeRequest("/workspaces");
+      return response.results || [];
+    } catch (error) {
+      console.error('Error getting workspaces:', error);
+      throw error;
+    }
   }
 
   async getWorkspace(workspaceId: string): Promise<Workspace> {
@@ -137,8 +145,13 @@ export class ProlificService {
   }
 
   async findWorkspaceByTitle(title: string): Promise<Workspace | null> {
-    const workspaces = await this.getAllWorkspaces();
-    return workspaces.find(workspace => workspace.title === title) || null;
+    try {
+      const workspaces = await this.getAllWorkspaces();
+      return workspaces.find(workspace => workspace.title === title) || null;
+    } catch (error) {
+      console.error('Error finding workspace by title:', error);
+      throw error;
+    }
   }
 
   async ensureWorkspaceExists(title: string): Promise<Workspace> {
@@ -154,6 +167,48 @@ export class ProlificService {
     console.log(`Created workspace: ${title} (${newWorkspace.id})`);
     
     return newWorkspace;
+  }
+
+  async getProjectsForWorkspace(workspaceId: string): Promise<Project[]> {
+    try {
+      const response = await this.makeRequest(`/workspaces/${workspaceId}/projects`);
+      return response.results || [];
+    } catch (error) {
+      console.error('Error getting projects for workspace:', error);
+      throw error;
+    }
+  }
+
+  async createProject(workspaceId: string, projectData: CreateProjectRequest): Promise<Project> {
+    return this.makeRequest(`/workspaces/${workspaceId}/projects/`, {
+      method: "POST",
+      body: JSON.stringify(projectData),
+    });
+  }
+
+  async findProjectByTitle(workspaceId: string, title: string): Promise<Project | null> {
+    try {
+      const projects = await this.getProjectsForWorkspace(workspaceId);
+      return projects.find(project => project.title === title) || null;
+    } catch (error) {
+      console.error('Error finding project by title:', error);
+      throw error;
+    }
+  }
+
+  async ensureProjectExists(workspaceId: string, title: string): Promise<Project> {
+    const existingProject = await this.findProjectByTitle(workspaceId, title);
+    
+    if (existingProject) {
+      console.log(`Using existing project: ${title} (${existingProject.id})`);
+      return existingProject;
+    }
+
+    console.log(`Creating new project: ${title} in workspace ${workspaceId}`);
+    const newProject = await this.createProject(workspaceId, { title });
+    console.log(`Created project: ${title} (${newProject.id})`);
+    
+    return newProject;
   }
 
   async createStudy(studyData: CreateStudyRequest): Promise<Study> {

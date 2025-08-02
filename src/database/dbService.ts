@@ -238,6 +238,24 @@ export class DatabaseService {
     );
   }
 
+  async deleteTask(id: string): Promise<void> {
+    if (!this.isConnected) {
+      await this.initializeConnection();
+    }
+
+    const taskData = await this.client.hGetAll(`task:${id}`);
+    if (!taskData || Object.keys(taskData).length === 0) {
+      throw new Error(`Task ${id} not found`);
+    }
+
+    const multi = this.client.multi();
+    multi.del(`task:${id}`);
+    multi.sRem(`tasks:status:${taskData.status}`, id);
+    multi.zRem('tasks:created', id);
+    
+    await multi.exec();
+  }
+
   async close(): Promise<void> {
     if (this.isConnected) {
       await this.client.disconnect();
