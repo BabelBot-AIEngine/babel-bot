@@ -1,6 +1,6 @@
 import { MediaArticle, EditorialGuidelines, TranslationResult } from "../types";
 import * as deepl from "deepl-node";
-import Anthropic from '@anthropic-ai/sdk';
+import Anthropic from "@anthropic-ai/sdk";
 
 export class TranslationService {
   private translator?: deepl.Translator;
@@ -13,7 +13,7 @@ export class TranslationService {
       throw new Error("DEEPL_API_KEY environment variable is required");
     }
     this.translator = new deepl.Translator(authKey);
-this.anthropic = new Anthropic({
+    this.anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY,
     });
   }
@@ -26,8 +26,14 @@ this.anthropic = new Anthropic({
     const results: TranslationResult[] = [];
     this.setup();
     for (const language of destinationLanguages) {
-      const translatedText = await this.performTranslation(article.text, language);
-      const reviewNotes = await this.reviewAgainstGuidelines(translatedText, guidelines);
+      const translatedText = await this.performTranslation(
+        article.text,
+        language
+      );
+      const reviewNotes = await this.reviewAgainstGuidelines(
+        translatedText,
+        guidelines
+      );
       const complianceScore = this.calculateComplianceScore(reviewNotes);
 
       results.push({
@@ -64,22 +70,30 @@ this.anthropic = new Anthropic({
   ): Promise<string[]> {
     try {
       const prompt = this.buildReviewPrompt(translatedText, guidelines);
-      
-      const response = await this.anthropic.messages.create({
+
+      const response = await this.anthropic?.messages.create({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
         messages: [{ role: "user", content: prompt }],
       });
 
-      const reviewText = response.content[0].type === 'text' ? response.content[0].text : '';
+      const reviewText =
+        response?.content[0].type === "text" ? response?.content[0].text : "";
       return this.parseReviewResponse(reviewText);
     } catch (error) {
-      console.error('LLM review error:', error);
-      return [`Review failed: ${error instanceof Error ? error.message : 'Unknown error'}`];
+      console.error("LLM review error:", error);
+      return [
+        `Review failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      ];
     }
   }
 
-  private buildReviewPrompt(text: string, guidelines: EditorialGuidelines): string {
+  private buildReviewPrompt(
+    text: string,
+    guidelines: EditorialGuidelines
+  ): string {
     let prompt = `Please review the following text against the editorial guidelines provided. Provide specific feedback on compliance and areas for improvement.
 
 Text to review:
@@ -97,10 +111,10 @@ Editorial Guidelines:`;
       prompt += `\n- Target Audience: ${guidelines.targetAudience}`;
     }
     if (guidelines.restrictions && guidelines.restrictions.length > 0) {
-      prompt += `\n- Restrictions: ${guidelines.restrictions.join(', ')}`;
+      prompt += `\n- Restrictions: ${guidelines.restrictions.join(", ")}`;
     }
     if (guidelines.requirements && guidelines.requirements.length > 0) {
-      prompt += `\n- Requirements: ${guidelines.requirements.join(', ')}`;
+      prompt += `\n- Requirements: ${guidelines.requirements.join(", ")}`;
     }
 
     prompt += `\n\nPlease provide your review as a numbered list of specific observations, each on a new line starting with a number and period (e.g., "1. The tone is...").`;
@@ -109,19 +123,19 @@ Editorial Guidelines:`;
   }
 
   private parseReviewResponse(reviewText: string): string[] {
-    const lines = reviewText.split('\n').filter(line => line.trim());
+    const lines = reviewText.split("\n").filter((line) => line.trim());
     const notes: string[] = [];
 
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.match(/^\d+\./)) {
-        notes.push(trimmed.replace(/^\d+\.\s*/, ''));
+        notes.push(trimmed.replace(/^\d+\.\s*/, ""));
       } else if (trimmed && !trimmed.match(/^(please|here|the following)/i)) {
         notes.push(trimmed);
       }
     }
 
-    return notes.length > 0 ? notes : ['Review completed successfully'];
+    return notes.length > 0 ? notes : ["Review completed successfully"];
   }
 
   private calculateComplianceScore(reviewNotes: string[]): number {
