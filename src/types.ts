@@ -21,11 +21,14 @@ export interface TranslationRequest {
   guide?: GuideType;
 }
 
+export type LanguageTaskStatus = 'pending' | 'translating' | 'llm_verification' | 'human_review' | 'done' | 'failed';
+
 export interface TranslationResult {
   language: string;
   translatedText: string;
   reviewNotes?: string[];
   complianceScore?: number;
+  status?: LanguageTaskStatus;
 }
 
 export interface TranslationResponse {
@@ -55,3 +58,32 @@ export interface TaskStatusResponse {
 export interface TaskListResponse {
   tasks: TranslationTask[];
 }
+
+export const getLanguageStatesForTask = (task: TranslationTask): Map<string, LanguageTaskStatus> => {
+  const states = new Map<string, LanguageTaskStatus>();
+  
+  if (!task.result?.translations) {
+    task.destinationLanguages.forEach(lang => {
+      states.set(lang, task.status);
+    });
+    return states;
+  }
+  
+  task.result.translations.forEach(translation => {
+    states.set(translation.language, translation.status || task.status);
+  });
+  
+  task.destinationLanguages.forEach(lang => {
+    if (!states.has(lang)) {
+      states.set(lang, task.status);
+    }
+  });
+  
+  return states;
+};
+
+export const hasMultipleLanguageStates = (task: TranslationTask): boolean => {
+  const states = getLanguageStatesForTask(task);
+  const uniqueStates = new Set(states.values());
+  return uniqueStates.size > 1;
+};

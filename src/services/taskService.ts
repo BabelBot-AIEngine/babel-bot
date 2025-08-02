@@ -64,25 +64,26 @@ export class TaskService {
       await this.sleep(1500);
 
       const verifiedTranslations = await this.verifyTranslations(translations);
-
-      await this.dbService.updateTask(taskId, {
-        status: "human_review",
-        progress: 80,
-      });
-
-      await this.sleep(2000);
-
+      
       const result: TranslationResponse = {
         originalArticle: task.mediaArticle,
         translations: verifiedTranslations,
         processedAt: new Date().toISOString(),
       };
 
+      const taskStatus = this.determineOverallTaskStatus(verifiedTranslations);
+      const progress = taskStatus === 'done' ? 100 : 80;
+
       await this.dbService.updateTask(taskId, {
-        status: "done",
-        progress: 100,
+        status: taskStatus,
+        progress,
         result,
       });
+
+      if (taskStatus === 'human_review') {
+        await this.sleep(2000);
+        await this.processHumanReview(taskId, verifiedTranslations);
+      }
     } catch (error) {
       console.error(`Error processing task ${taskId}:`, error);
       await this.dbService.updateTask(taskId, {
@@ -93,11 +94,51 @@ export class TaskService {
   }
 
   private async verifyTranslations(translations: any[]): Promise<any[]> {
-    return translations.map((translation) => ({
-      ...translation,
-      reviewNotes: ["LLM verification completed", "Quality check passed"],
-      complianceScore: Math.floor(Math.random() * 20) + 80,
-    }));
+    return translations.map((translation) => {
+      const complianceScore = Math.floor(Math.random() * 40) + 60;
+      const status = complianceScore >= 70 ? 'done' : 'human_review';
+      
+      return {
+        ...translation,
+        reviewNotes: ["LLM verification completed", status === 'done' ? "Quality check passed" : "Needs human review"],
+        complianceScore,
+        status,
+      };
+    });
+  }
+
+  private determineOverallTaskStatus(translations: any[]): 'done' | 'human_review' {
+    const hasHumanReview = translations.some(t => t.status === 'human_review');
+    return hasHumanReview ? 'human_review' : 'done';
+  }
+
+  private async processHumanReview(taskId: string, translations: any[]): Promise<void> {
+    const updatedTranslations = translations.map(translation => {
+      if (translation.status === 'human_review') {
+        const approved = Math.random() > 0.3;
+        return {
+          ...translation,
+          status: approved ? 'done' : 'failed',
+          reviewNotes: [...(translation.reviewNotes || []), 
+            approved ? 'Human review approved' : 'Human review rejected']
+        };
+      }
+      return translation;
+    });
+
+    const task = await this.dbService.getTask(taskId);
+    if (task?.result) {
+      const finalStatus = this.determineOverallTaskStatus(updatedTranslations);
+      
+      await this.dbService.updateTask(taskId, {
+        status: finalStatus,
+        progress: 100,
+        result: {
+          ...task.result,
+          translations: updatedTranslations
+        }
+      });
+    }
   }
 
   private sleep(ms: number): Promise<void> {
