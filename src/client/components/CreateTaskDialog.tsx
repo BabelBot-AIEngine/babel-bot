@@ -16,6 +16,7 @@ import {
   SelectChangeEvent,
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
+import { getAllLanguageOptions, getLanguageDisplayName } from '../../utils/languageUtils';
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -27,20 +28,7 @@ interface CreateTaskDialogProps {
   }) => void;
 }
 
-const availableLanguages = [
-  'Spanish',
-  'French',
-  'German',
-  'Italian',
-  'Portuguese',
-  'Dutch',
-  'Polish',
-  'Russian',
-  'Japanese',
-  'Chinese',
-  'Korean',
-  'Arabic',
-];
+const availableLanguages = getAllLanguageOptions();
 
 const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   open,
@@ -279,7 +267,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                   {selected.map((value) => (
                     <Chip 
                       key={value} 
-                      label={value} 
+                      label={getLanguageDisplayName(value)} 
                       size="small"
                       sx={{
                         background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
@@ -292,8 +280,8 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               )}
             >
               {availableLanguages.map((language) => (
-                <MenuItem key={language} value={language}>
-                  {language}
+                <MenuItem key={language.code} value={language.code}>
+                  {language.name}
                 </MenuItem>
               ))}
             </Select>
