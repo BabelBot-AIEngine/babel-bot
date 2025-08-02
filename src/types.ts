@@ -1,5 +1,15 @@
 export type GuideType = "financialtimes" | "monzo" | "prolific";
 
+export interface HumanReviewConfig {
+  confidenceThreshold: number;
+  workspaceId: string;
+  taskDetails: {
+    taskName: string;
+    taskIntroduction: string;
+    taskSteps: string;
+  };
+}
+
 export interface MediaArticle {
   text: string;
   title?: string;
@@ -36,12 +46,23 @@ export interface TranslationResult {
   reviewNotes?: string[];
   complianceScore?: number;
   status?: LanguageTaskStatus;
+  batchId?: string;
+  studyId?: string;
 }
 
 export interface TranslationResponse {
   originalArticle: MediaArticle;
   translations: TranslationResult[];
   processedAt: string;
+}
+
+export interface HumanReviewBatch {
+  language: string;
+  batchId: string;
+  studyId: string;
+  datasetId: string;
+  projectId: string;
+  createdAt: string;
 }
 
 export interface TranslationTask {
@@ -63,6 +84,7 @@ export interface TranslationTask {
   createdAt: string;
   updatedAt: string;
   progress?: number;
+  humanReviewBatches?: HumanReviewBatch[];
 }
 
 export interface TaskStatusResponse {
@@ -102,6 +124,47 @@ export const hasMultipleLanguageStates = (task: TranslationTask): boolean => {
   const states = getLanguageStatesForTask(task);
   const uniqueStates = new Set(states.values());
   return uniqueStates.size > 1;
+};
+
+export interface TaskCardDisplayInfo {
+  task: TranslationTask;
+  filteredLanguages: string[];
+  isPartialDisplay: boolean;
+}
+
+export const getLanguagesForStatus = (
+  task: TranslationTask,
+  targetStatus: LanguageTaskStatus
+): string[] => {
+  const languageStates = getLanguageStatesForTask(task);
+  const languages: string[] = [];
+  
+  languageStates.forEach((status, language) => {
+    if (status === targetStatus) {
+      languages.push(language);
+    }
+  });
+  
+  return languages;
+};
+
+export const getTaskDisplayInfoForStatus = (
+  task: TranslationTask,
+  targetStatus: LanguageTaskStatus
+): TaskCardDisplayInfo | null => {
+  const languagesInStatus = getLanguagesForStatus(task, targetStatus);
+  
+  if (languagesInStatus.length === 0) {
+    return null;
+  }
+  
+  const isPartialDisplay = hasMultipleLanguageStates(task);
+  
+  return {
+    task,
+    filteredLanguages: languagesInStatus,
+    isPartialDisplay
+  };
 };
 
 // Prolific Filter Types

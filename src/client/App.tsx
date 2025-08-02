@@ -81,7 +81,7 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<TranslationTask[]>([]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [pollingInterval, setPollingInterval] = useState(15000);
+  const [pollingInterval, setPollingInterval] = useState(5000);
   const [isPolling, setIsPolling] = useState(false);
 
   const fetchTasks = async (showLoading = false) => {
@@ -190,6 +190,7 @@ const App: React.FC = () => {
                   },
                 }}
               >
+                <MenuItem value={1000}>1s</MenuItem>
                 <MenuItem value={5000}>5s</MenuItem>
                 <MenuItem value={15000}>15s</MenuItem>
                 <MenuItem value={30000}>30s</MenuItem>
