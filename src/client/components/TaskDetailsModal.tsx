@@ -41,6 +41,7 @@ import {
   StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
 import { TranslationTask } from '../../types';
+import { getLanguageDisplayName } from '../../utils/languageUtils';
 
 interface TaskDetailsModalProps {
   task: TranslationTask | null;
@@ -408,7 +409,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
                       {task.destinationLanguages.map(lang => (
                         <Chip
                           key={lang}
-                          label={lang}
+                          label={getLanguageDisplayName(lang)}
                           sx={{ 
                             fontSize: '0.875rem',
                             fontWeight: 600,
@@ -652,7 +653,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                           <Chip
-                            label={translation.language}
+                            label={getLanguageDisplayName(translation.language)}
                             sx={{
                               background: getStatusGradient(),
                               color: 'white',

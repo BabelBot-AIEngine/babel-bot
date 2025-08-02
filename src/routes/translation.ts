@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { TaskService } from "../services/taskService";
+import { TranslationService } from "../services/translationService";
 import {
   TranslationRequest,
   TaskStatusResponse,
@@ -8,6 +9,7 @@ import {
 
 const router = Router();
 const taskService = new TaskService();
+const translationService = new TranslationService();
 
 router.post("/translate", async (req: Request, res: Response) => {
   try {
@@ -55,6 +57,21 @@ router.post("/translate", async (req: Request, res: Response) => {
     console.error("Translation error:", error);
     res.status(500).json({
       error: "Internal server error during translation",
+    });
+  }
+});
+
+router.get("/languages", async (req: Request, res: Response) => {
+  try {
+    const languages = await translationService.getAvailableLanguages();
+    res.json({
+      languages,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error fetching languages:", error);
+    res.status(500).json({
+      error: "Failed to fetch available languages",
     });
   }
 });

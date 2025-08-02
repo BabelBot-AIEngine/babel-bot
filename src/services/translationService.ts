@@ -30,6 +30,58 @@ export class TranslationService {
     }
   }
 
+  async getAvailableLanguages(): Promise<Array<{ code: string; name: string }>> {
+    this.setup();
+    const isDemoMode = process.env.DEMO_MODE === "true";
+
+    if (isDemoMode) {
+      // In demo mode, simulate actual DeepL supported languages with proper codes
+      return [
+        { code: 'BG', name: 'Bulgarian' },
+        { code: 'CS', name: 'Czech' },
+        { code: 'DA', name: 'Danish' },
+        { code: 'DE', name: 'German' },
+        { code: 'EL', name: 'Greek' },
+        { code: 'EN-GB', name: 'English (British)' },
+        { code: 'EN-US', name: 'English (American)' },
+        { code: 'ES', name: 'Spanish' },
+        { code: 'ET', name: 'Estonian' },
+        { code: 'FI', name: 'Finnish' },
+        { code: 'FR', name: 'French' },
+        { code: 'HU', name: 'Hungarian' },
+        { code: 'ID', name: 'Indonesian' },
+        { code: 'IT', name: 'Italian' },
+        { code: 'JA', name: 'Japanese' },
+        { code: 'KO', name: 'Korean' },
+        { code: 'LT', name: 'Lithuanian' },
+        { code: 'LV', name: 'Latvian' },
+        { code: 'NB', name: 'Norwegian (Bokmål)' },
+        { code: 'NL', name: 'Dutch' },
+        { code: 'PL', name: 'Polish' },
+        { code: 'PT-BR', name: 'Portuguese (Brazilian)' },
+        { code: 'PT-PT', name: 'Portuguese (European)' },
+        { code: 'RO', name: 'Romanian' },
+        { code: 'RU', name: 'Russian' },
+        { code: 'SK', name: 'Slovak' },
+        { code: 'SL', name: 'Slovenian' },
+        { code: 'SV', name: 'Swedish' },
+        { code: 'TR', name: 'Turkish' },
+        { code: 'UK', name: 'Ukrainian' },
+        { code: 'ZH', name: 'Chinese (Simplified)' }
+      ];
+    }
+
+    if (!this.translator) {
+      throw new Error("DeepL translator not initialized");
+    }
+
+    const languages = await this.translator.getTargetLanguages();
+    return languages.map(lang => ({
+      code: lang.code,
+      name: lang.name
+    }));
+  }
+
   async translateArticle(
     article: MediaArticle,
     guidelines: EditorialGuidelines,
