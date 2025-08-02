@@ -30,16 +30,16 @@ export class TranslationService {
         article.text,
         language
       );
-      const reviewNotes = await this.reviewAgainstGuidelines(
+      const reviewResult = await this.reviewAgainstGuidelines(
         translatedText,
         guidelines
       );
-      const complianceScore = this.calculateComplianceScore(reviewNotes);
+      const complianceScore = reviewResult.score;
 
       results.push({
         language,
         translatedText,
-        reviewNotes,
+        reviewNotes: reviewResult.notes,
         complianceScore,
       });
     }
@@ -67,7 +67,7 @@ export class TranslationService {
   private async reviewAgainstGuidelines(
     translatedText: string,
     guidelines: EditorialGuidelines
-  ): Promise<string[]> {
+  ): Promise<{ notes: string[]; score: number }> {
     try {
       const prompt = this.buildReviewPrompt(translatedText, guidelines);
 
@@ -82,11 +82,14 @@ export class TranslationService {
       return this.parseReviewResponse(reviewText);
     } catch (error) {
       console.error("LLM review error:", error);
-      return [
-        `Review failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
-      ];
+      return {
+        notes: [
+          `Review failed: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        ],
+        score: 50, // Default score for failed reviews
+      };
     }
   }
 
@@ -117,17 +120,28 @@ Editorial Guidelines:`;
       prompt += `\n- Requirements: ${guidelines.requirements.join(", ")}`;
     }
 
-    prompt += `\n\nPlease provide your review as a numbered list of specific observations, each on a new line starting with a number and period (e.g., "1. The tone is...").`;
+    prompt += `\n\nPlease provide your review as a numbered list of specific observations, each on a new line starting with a number and period (e.g., "1. The tone is...").
+
+Additionally, at the end of your review, please provide an editorialComplianceScore as a number between 1 and 100, where 1 indicates very poor compliance with the guidelines and 100 indicates perfect compliance. Format this as: "editorialComplianceScore: [number]"`;
 
     return prompt;
   }
 
-  private parseReviewResponse(reviewText: string): string[] {
+  private parseReviewResponse(reviewText: string): { notes: string[]; score: number } {
     const lines = reviewText.split("\n").filter((line) => line.trim());
     const notes: string[] = [];
+    let score = 50; // Default score if not found
 
     for (const line of lines) {
       const trimmed = line.trim();
+      
+      // Check for editorialComplianceScore
+      const scoreMatch = trimmed.match(/editorialComplianceScore:\s*(\d+(?:\.\d+)?)/i);
+      if (scoreMatch) {
+        score = Math.min(Math.max(parseFloat(scoreMatch[1]), 1), 100); // Ensure score is between 1-100
+        continue; // Skip adding this line to notes
+      }
+      
       if (trimmed.match(/^\d+\./)) {
         notes.push(trimmed.replace(/^\d+\.\s*/, ""));
       } else if (trimmed && !trimmed.match(/^(please|here|the following)/i)) {
@@ -135,10 +149,10 @@ Editorial Guidelines:`;
       }
     }
 
-    return notes.length > 0 ? notes : ["Review completed successfully"];
+    return {
+      notes: notes.length > 0 ? notes : ["Review completed successfully"],
+      score
+    };
   }
 
-  private calculateComplianceScore(reviewNotes: string[]): number {
-    return Math.min(95 + Math.random() * 5, 100);
-  }
 }
