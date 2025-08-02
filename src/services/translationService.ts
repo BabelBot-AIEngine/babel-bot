@@ -54,7 +54,8 @@ export class TranslationService {
       );
       const reviewResult = await this.reviewService.reviewAgainstGuidelines(
         translatedText,
-        effectiveGuidelines
+        effectiveGuidelines,
+        contextText
       );
       const complianceScore = reviewResult.score;
 
