@@ -1,6 +1,6 @@
 import { DatabaseService, TranslationTask } from '../database/dbService';
 import { TranslationService } from './translationService';
-import { MediaArticle, EditorialGuidelines, TranslationResponse } from '../types';
+import { MediaArticle, EditorialGuidelines, TranslationResponse, GuideType } from '../types';
 
 export class TaskService {
   private dbService: DatabaseService;
@@ -14,7 +14,8 @@ export class TaskService {
   async createTranslationTask(
     mediaArticle: MediaArticle,
     editorialGuidelines: EditorialGuidelines,
-    destinationLanguages: string[]
+    destinationLanguages: string[],
+    guide?: GuideType
   ): Promise<string> {
     const taskId = await this.dbService.createTask({
       status: 'pending',
@@ -24,11 +25,11 @@ export class TaskService {
       progress: 0
     });
 
-    this.processTaskAsync(taskId);
+    this.processTaskAsync(taskId, guide);
     return taskId;
   }
 
-  private async processTaskAsync(taskId: string): Promise<void> {
+  private async processTaskAsync(taskId: string, guide?: GuideType): Promise<void> {
     try {
       const task = await this.dbService.getTask(taskId);
       if (!task) {
@@ -45,7 +46,8 @@ export class TaskService {
       const translations = await this.translationService.translateArticle(
         task.mediaArticle,
         task.editorialGuidelines,
-        task.destinationLanguages
+        task.destinationLanguages,
+        guide
       );
 
       await this.dbService.updateTask(taskId, { 

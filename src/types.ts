@@ -21,11 +21,31 @@ export interface TranslationRequest {
   guide?: GuideType;
 }
 
+export interface AnthropicReviewResponse {
+  content: Array<{
+    type: 'text';
+    text: string;
+  }>;
+  model: string;
+  role: 'assistant';
+  stop_reason: 'end_turn' | 'max_tokens' | 'stop_sequence';
+  stop_sequence?: string;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+}
+
+export interface ParsedReviewResult {
+  notes: string[];
+  score: number;
+}
+
 export interface TranslationResult {
   language: string;
   translatedText: string;
-  reviewNotes?: string[];
-  complianceScore?: number;
+  reviewNotes: string[];
+  complianceScore: number;
 }
 
 export interface TranslationResponse {

@@ -1,4 +1,4 @@
-import { MediaArticle, EditorialGuidelines, TranslationResult, GuideType } from "../types";
+import { MediaArticle, EditorialGuidelines, TranslationResult, GuideType, AnthropicReviewResponse, ParsedReviewResult } from "../types";
 import * as deepl from "deepl-node";
 import * as fs from "fs";
 import * as path from "path";
@@ -138,7 +138,7 @@ export class TranslationService {
   private async reviewAgainstGuidelines(
     translatedText: string,
     guidelines: EditorialGuidelines
-  ): Promise<{ notes: string[]; score: number }> {
+  ): Promise<ParsedReviewResult> {
     const isDemoMode = process.env.DEMO_MODE === 'true';
     
     if (isDemoMode) {
@@ -161,7 +161,7 @@ export class TranslationService {
         model: "claude-sonnet-4-20250514",
         max_tokens: 1024,
         messages: [{ role: "user", content: prompt }],
-      });
+      }) as AnthropicReviewResponse;
 
       const reviewText =
         response?.content[0].type === "text" ? response?.content[0].text : "";
@@ -213,10 +213,7 @@ Additionally, at the end of your review, please provide an editorialComplianceSc
     return prompt;
   }
 
-  private parseReviewResponse(reviewText: string): {
-    notes: string[];
-    score: number;
-  } {
+  private parseReviewResponse(reviewText: string): ParsedReviewResult {
     const lines = reviewText.split("\n").filter((line) => line.trim());
     const notes: string[] = [];
     let score = 50; // Default score if not found
