@@ -1,9 +1,16 @@
-import sqlite3 from 'sqlite3';
-import path from 'path';
+import sqlite3 from "sqlite3";
+import path from "path";
+import { GuideType } from "../types";
 
 export interface TranslationTask {
   id: string;
-  status: 'pending' | 'translating' | 'llm_verification' | 'human_review' | 'done' | 'failed';
+  status:
+    | "pending"
+    | "translating"
+    | "llm_verification"
+    | "human_review"
+    | "done"
+    | "failed";
   mediaArticle: {
     text: string;
     title?: string;
@@ -16,6 +23,7 @@ export interface TranslationTask {
   createdAt: string;
   updatedAt: string;
   progress?: number;
+  guide?: GuideType;
 }
 
 export class DatabaseService {
@@ -23,7 +31,7 @@ export class DatabaseService {
   private dbPath: string;
 
   constructor() {
-    this.dbPath = path.join(process.cwd(), 'translation_tasks.db');
+    this.dbPath = path.join(process.cwd(), "translation_tasks.db");
     this.db = new sqlite3.Database(this.dbPath);
     this.initializeDatabase();
   }
@@ -46,23 +54,27 @@ export class DatabaseService {
 
     this.db.run(createTasksTable, (err) => {
       if (err) {
-        console.error('Error creating translation_tasks table:', err);
+        console.error("Error creating translation_tasks table:", err);
       } else {
-        console.log('Database initialized successfully');
+        console.log("Database initialized successfully");
       }
     });
   }
 
-  async createTask(task: Omit<TranslationTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  async createTask(
+    task: Omit<TranslationTask, "id" | "createdAt" | "updatedAt">
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
-      const id = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const id = `task_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
       const now = new Date().toISOString();
-      
+
       const insertTask = `
         INSERT INTO translation_tasks (
-          id, status, media_article, editorial_guidelines, 
-          destination_languages, result, error, created_at, updated_at, progress
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, status, media_article, editorial_guidelines,
+          destination_languages, result, error, created_at, updated_at, progress, guide
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       this.db.run(
@@ -77,9 +89,10 @@ export class DatabaseService {
           task.error || null,
           now,
           now,
-          task.progress || 0
+          task.progress || 0,
+          task.guide || null,
         ],
-        function(err) {
+        function (err) {
           if (err) {
             reject(err);
           } else {
@@ -90,36 +103,41 @@ export class DatabaseService {
     });
   }
 
-  async updateTask(id: string, updates: Partial<TranslationTask>): Promise<void> {
+  async updateTask(
+    id: string,
+    updates: Partial<TranslationTask>
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       const now = new Date().toISOString();
       const fields = [];
       const values = [];
 
       if (updates.status) {
-        fields.push('status = ?');
+        fields.push("status = ?");
         values.push(updates.status);
       }
       if (updates.result !== undefined) {
-        fields.push('result = ?');
+        fields.push("result = ?");
         values.push(JSON.stringify(updates.result));
       }
       if (updates.error !== undefined) {
-        fields.push('error = ?');
+        fields.push("error = ?");
         values.push(updates.error);
       }
       if (updates.progress !== undefined) {
-        fields.push('progress = ?');
+        fields.push("progress = ?");
         values.push(updates.progress);
       }
 
-      fields.push('updated_at = ?');
+      fields.push("updated_at = ?");
       values.push(now);
       values.push(id);
 
-      const updateQuery = `UPDATE translation_tasks SET ${fields.join(', ')} WHERE id = ?`;
+      const updateQuery = `UPDATE translation_tasks SET ${fields.join(
+        ", "
+      )} WHERE id = ?`;
 
-      this.db.run(updateQuery, values, function(err) {
+      this.db.run(updateQuery, values, function (err) {
         if (err) {
           reject(err);
         } else {
@@ -131,8 +149,8 @@ export class DatabaseService {
 
   async getTask(id: string): Promise<TranslationTask | null> {
     return new Promise((resolve, reject) => {
-      const query = 'SELECT * FROM translation_tasks WHERE id = ?';
-      
+      const query = "SELECT * FROM translation_tasks WHERE id = ?";
+
       this.db.get(query, [id], (err, row: any) => {
         if (err) {
           reject(err);
@@ -147,27 +165,30 @@ export class DatabaseService {
 
   async getAllTasks(): Promise<TranslationTask[]> {
     return new Promise((resolve, reject) => {
-      const query = 'SELECT * FROM translation_tasks ORDER BY created_at DESC';
-      
+      const query = "SELECT * FROM translation_tasks ORDER BY created_at DESC";
+
       this.db.all(query, [], (err, rows: any[]) => {
         if (err) {
           reject(err);
         } else {
-          resolve(rows.map(row => this.mapRowToTask(row)));
+          resolve(rows.map((row) => this.mapRowToTask(row)));
         }
       });
     });
   }
 
-  async getTasksByStatus(status: TranslationTask['status']): Promise<TranslationTask[]> {
+  async getTasksByStatus(
+    status: TranslationTask["status"]
+  ): Promise<TranslationTask[]> {
     return new Promise((resolve, reject) => {
-      const query = 'SELECT * FROM translation_tasks WHERE status = ? ORDER BY created_at DESC';
-      
+      const query =
+        "SELECT * FROM translation_tasks WHERE status = ? ORDER BY created_at DESC";
+
       this.db.all(query, [status], (err, rows: any[]) => {
         if (err) {
           reject(err);
         } else {
-          resolve(rows.map(row => this.mapRowToTask(row)));
+          resolve(rows.map((row) => this.mapRowToTask(row)));
         }
       });
     });
@@ -184,7 +205,7 @@ export class DatabaseService {
       error: row.error || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      progress: row.progress || 0
+      progress: row.progress || 0,
     };
   }
 

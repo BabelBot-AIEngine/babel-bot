@@ -1,31 +1,39 @@
-import { Router, Request, Response } from 'express';
-import { TranslationService } from '../services/translationService';
-import { TaskService } from '../services/taskService';
-import { GuideType, TranslationRequest, TranslationResponse, TaskStatusResponse, TaskListResponse } from '../types';
+import { Router, Request, Response } from "express";
+import { TaskService } from "../services/taskService";
+import {
+  TranslationRequest,
+  TaskStatusResponse,
+  TaskListResponse,
+} from "../types";
 
 const router = Router();
-const translationService = new TranslationService();
 const taskService = new TaskService();
 
-router.post('/translate', async (req: Request, res: Response) => {
+router.post("/translate", async (req: Request, res: Response) => {
   try {
-    const { mediaArticle, editorialGuidelines, destinationLanguages, guide }: TranslationRequest = req.body;
+    const {
+      mediaArticle,
+      editorialGuidelines,
+      destinationLanguages,
+      guide,
+    }: TranslationRequest = req.body;
 
     if (!mediaArticle || !mediaArticle.text) {
       return res.status(400).json({
-        error: 'Media article with text is required'
+        error: "Media article with text is required",
       });
     }
 
     if (!destinationLanguages || destinationLanguages.length === 0) {
       return res.status(400).json({
-        error: 'At least one destination language is required'
+        error: "At least one destination language is required",
       });
     }
-    
-    if (guide && !['financialtimes', 'monzo', 'prolific'].includes(guide)) {
+
+    if (guide && !["financialtimes", "monzo", "prolific"].includes(guide)) {
       return res.status(400).json({
-        error: 'Invalid guide parameter. Must be one of: financialtimes, monzo, prolific'
+        error:
+          "Invalid guide parameter. Must be one of: financialtimes, monzo, prolific",
       });
     }
 
@@ -38,52 +46,52 @@ router.post('/translate', async (req: Request, res: Response) => {
 
     res.json({
       taskId,
-      message: 'Translation task created successfully',
-      pollUrl: `/api/tasks/${taskId}`
+      message: "Translation task created successfully",
+      pollUrl: `/api/tasks/${taskId}`,
     });
   } catch (error) {
-    console.error('Translation error:', error);
+    console.error("Translation error:", error);
     res.status(500).json({
-      error: 'Internal server error during translation'
+      error: "Internal server error during translation",
     });
   }
 });
 
-router.get('/health', (req: Request, res: Response) => {
+router.get("/health", (req: Request, res: Response) => {
   res.json({
-    status: 'healthy',
-    service: 'translation-api',
-    timestamp: new Date().toISOString()
+    status: "healthy",
+    service: "translation-api",
+    timestamp: new Date().toISOString(),
   });
 });
 
-router.get('/tasks/:taskId', async (req: Request, res: Response) => {
+router.get("/tasks/:taskId", async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
     const task = await taskService.getTask(taskId);
-    
+
     if (!task) {
       return res.status(404).json({
-        error: 'Task not found'
+        error: "Task not found",
       });
     }
 
     const response: TaskStatusResponse = { task };
     res.json(response);
   } catch (error) {
-    console.error('Error fetching task:', error);
+    console.error("Error fetching task:", error);
     res.status(500).json({
-      error: 'Internal server error'
+      error: "Internal server error",
     });
   }
 });
 
-router.get('/tasks', async (req: Request, res: Response) => {
+router.get("/tasks", async (req: Request, res: Response) => {
   try {
     const { status } = req.query;
-    
+
     let tasks;
-    if (status && typeof status === 'string') {
+    if (status && typeof status === "string") {
       tasks = await taskService.getTasksByStatus(status as any);
     } else {
       tasks = await taskService.getAllTasks();
@@ -92,9 +100,9 @@ router.get('/tasks', async (req: Request, res: Response) => {
     const response: TaskListResponse = { tasks };
     res.json(response);
   } catch (error) {
-    console.error('Error fetching tasks:', error);
+    console.error("Error fetching tasks:", error);
     res.status(500).json({
-      error: 'Internal server error'
+      error: "Internal server error",
     });
   }
 });

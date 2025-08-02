@@ -1,6 +1,11 @@
-import { DatabaseService, TranslationTask } from '../database/dbService';
-import { TranslationService } from './translationService';
-import { MediaArticle, EditorialGuidelines, TranslationResponse } from '../types';
+import { DatabaseService, TranslationTask } from "../database/dbService";
+import { TranslationService } from "./translationService";
+import {
+  MediaArticle,
+  EditorialGuidelines,
+  TranslationResponse,
+  GuideType,
+} from "../types";
 
 export class TaskService {
   private dbService: DatabaseService;
@@ -14,14 +19,16 @@ export class TaskService {
   async createTranslationTask(
     mediaArticle: MediaArticle,
     editorialGuidelines: EditorialGuidelines,
-    destinationLanguages: string[]
+    destinationLanguages: string[],
+    guide?: GuideType
   ): Promise<string> {
     const taskId = await this.dbService.createTask({
-      status: 'pending',
+      status: "pending",
       mediaArticle,
       editorialGuidelines,
       destinationLanguages,
-      progress: 0
+      progress: 0,
+      guide,
     });
 
     this.processTaskAsync(taskId);
@@ -35,9 +42,9 @@ export class TaskService {
         throw new Error(`Task ${taskId} not found`);
       }
 
-      await this.dbService.updateTask(taskId, { 
-        status: 'translating', 
-        progress: 25 
+      await this.dbService.updateTask(taskId, {
+        status: "translating",
+        progress: 25,
       });
 
       await this.sleep(1000);
@@ -45,21 +52,22 @@ export class TaskService {
       const translations = await this.translationService.translateArticle(
         task.mediaArticle,
         task.editorialGuidelines,
-        task.destinationLanguages
+        task.destinationLanguages,
+        task.guide
       );
 
-      await this.dbService.updateTask(taskId, { 
-        status: 'llm_verification', 
-        progress: 60 
+      await this.dbService.updateTask(taskId, {
+        status: "llm_verification",
+        progress: 60,
       });
 
       await this.sleep(1500);
 
       const verifiedTranslations = await this.verifyTranslations(translations);
 
-      await this.dbService.updateTask(taskId, { 
-        status: 'human_review', 
-        progress: 80 
+      await this.dbService.updateTask(taskId, {
+        status: "human_review",
+        progress: 80,
       });
 
       await this.sleep(2000);
@@ -67,34 +75,33 @@ export class TaskService {
       const result: TranslationResponse = {
         originalArticle: task.mediaArticle,
         translations: verifiedTranslations,
-        processedAt: new Date().toISOString()
+        processedAt: new Date().toISOString(),
       };
 
-      await this.dbService.updateTask(taskId, { 
-        status: 'done', 
+      await this.dbService.updateTask(taskId, {
+        status: "done",
         progress: 100,
-        result 
+        result,
       });
-
     } catch (error) {
       console.error(`Error processing task ${taskId}:`, error);
-      await this.dbService.updateTask(taskId, { 
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error'
+      await this.dbService.updateTask(taskId, {
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
       });
     }
   }
 
   private async verifyTranslations(translations: any[]): Promise<any[]> {
-    return translations.map(translation => ({
+    return translations.map((translation) => ({
       ...translation,
-      reviewNotes: ['LLM verification completed', 'Quality check passed'],
-      complianceScore: Math.floor(Math.random() * 20) + 80
+      reviewNotes: ["LLM verification completed", "Quality check passed"],
+      complianceScore: Math.floor(Math.random() * 20) + 80,
     }));
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async getTask(taskId: string): Promise<TranslationTask | null> {
@@ -105,7 +112,9 @@ export class TaskService {
     return this.dbService.getAllTasks();
   }
 
-  async getTasksByStatus(status: TranslationTask['status']): Promise<TranslationTask[]> {
+  async getTasksByStatus(
+    status: TranslationTask["status"]
+  ): Promise<TranslationTask[]> {
     return this.dbService.getTasksByStatus(status);
   }
 }
