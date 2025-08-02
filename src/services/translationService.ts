@@ -35,20 +35,39 @@ export class TranslationService {
     const isDemoMode = process.env.DEMO_MODE === "true";
 
     if (isDemoMode) {
-      // Return demo languages when in demo mode
+      // In demo mode, simulate actual DeepL supported languages with proper codes
       return [
-        { code: 'es', name: 'Spanish' },
-        { code: 'fr', name: 'French' },
-        { code: 'de', name: 'German' },
-        { code: 'it', name: 'Italian' },
-        { code: 'pt', name: 'Portuguese' },
-        { code: 'nl', name: 'Dutch' },
-        { code: 'pl', name: 'Polish' },
-        { code: 'ru', name: 'Russian' },
-        { code: 'ja', name: 'Japanese' },
-        { code: 'zh', name: 'Chinese (Simplified)' },
-        { code: 'ko', name: 'Korean' },
-        { code: 'ar', name: 'Arabic' },
+        { code: 'BG', name: 'Bulgarian' },
+        { code: 'CS', name: 'Czech' },
+        { code: 'DA', name: 'Danish' },
+        { code: 'DE', name: 'German' },
+        { code: 'EL', name: 'Greek' },
+        { code: 'EN-GB', name: 'English (British)' },
+        { code: 'EN-US', name: 'English (American)' },
+        { code: 'ES', name: 'Spanish' },
+        { code: 'ET', name: 'Estonian' },
+        { code: 'FI', name: 'Finnish' },
+        { code: 'FR', name: 'French' },
+        { code: 'HU', name: 'Hungarian' },
+        { code: 'ID', name: 'Indonesian' },
+        { code: 'IT', name: 'Italian' },
+        { code: 'JA', name: 'Japanese' },
+        { code: 'KO', name: 'Korean' },
+        { code: 'LT', name: 'Lithuanian' },
+        { code: 'LV', name: 'Latvian' },
+        { code: 'NB', name: 'Norwegian (Bokmål)' },
+        { code: 'NL', name: 'Dutch' },
+        { code: 'PL', name: 'Polish' },
+        { code: 'PT-BR', name: 'Portuguese (Brazilian)' },
+        { code: 'PT-PT', name: 'Portuguese (European)' },
+        { code: 'RO', name: 'Romanian' },
+        { code: 'RU', name: 'Russian' },
+        { code: 'SK', name: 'Slovak' },
+        { code: 'SL', name: 'Slovenian' },
+        { code: 'SV', name: 'Swedish' },
+        { code: 'TR', name: 'Turkish' },
+        { code: 'UK', name: 'Ukrainian' },
+        { code: 'ZH', name: 'Chinese (Simplified)' }
       ];
     }
 
@@ -56,30 +75,11 @@ export class TranslationService {
       throw new Error("DeepL translator not initialized");
     }
 
-    try {
-      const languages = await this.translator.getTargetLanguages();
-      return languages.map(lang => ({
-        code: lang.code,
-        name: lang.name
-      }));
-    } catch (error) {
-      console.error("Failed to fetch languages from DeepL:", error);
-      // Fallback to demo languages if API fails
-      return [
-        { code: 'es', name: 'Spanish' },
-        { code: 'fr', name: 'French' },
-        { code: 'de', name: 'German' },
-        { code: 'it', name: 'Italian' },
-        { code: 'pt', name: 'Portuguese' },
-        { code: 'nl', name: 'Dutch' },
-        { code: 'pl', name: 'Polish' },
-        { code: 'ru', name: 'Russian' },
-        { code: 'ja', name: 'Japanese' },
-        { code: 'zh', name: 'Chinese (Simplified)' },
-        { code: 'ko', name: 'Korean' },
-        { code: 'ar', name: 'Arabic' },
-      ];
-    }
+    const languages = await this.translator.getTargetLanguages();
+    return languages.map(lang => ({
+      code: lang.code,
+      name: lang.name
+    }));
   }
 
   async translateArticle(

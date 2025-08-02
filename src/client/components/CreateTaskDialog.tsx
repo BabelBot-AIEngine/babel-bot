@@ -42,16 +42,19 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [availableLanguages, setAvailableLanguages] = useState<Array<{ code: string; name: string }>>([]);
   const [languagesLoading, setLanguagesLoading] = useState(false);
+  const [languagesError, setLanguagesError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadLanguages = async () => {
-      if (open && availableLanguages.length === 0) {
+      if (open && availableLanguages.length === 0 && !languagesLoading) {
         setLanguagesLoading(true);
+        setLanguagesError(null);
         try {
           const languages = await fetchAvailableLanguages();
           setAvailableLanguages(languages);
         } catch (error) {
           console.error('Failed to load languages:', error);
+          setLanguagesError(error instanceof Error ? error.message : 'Failed to load languages');
         } finally {
           setLanguagesLoading(false);
         }
@@ -59,10 +62,25 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     };
 
     loadLanguages();
-  }, [open, availableLanguages.length]);
+  }, [open, availableLanguages.length, languagesLoading]);
 
   const handleLanguageChange = (event: SelectChangeEvent<string[]>) => {
     setSelectedLanguages(event.target.value as string[]);
+  };
+
+  const retryLoadLanguages = async () => {
+    setAvailableLanguages([]);
+    setLanguagesError(null);
+    setLanguagesLoading(true);
+    try {
+      const languages = await fetchAvailableLanguages();
+      setAvailableLanguages(languages);
+    } catch (error) {
+      console.error('Failed to load languages:', error);
+      setLanguagesError(error instanceof Error ? error.message : 'Failed to load languages');
+    } finally {
+      setLanguagesLoading(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -281,7 +299,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               multiple
               value={selectedLanguages}
               onChange={handleLanguageChange}
-              disabled={languagesLoading}
+              disabled={languagesLoading || !!languagesError}
               renderValue={(selected) => (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {selected.map((value) => (
@@ -303,8 +321,33 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                 <MenuItem disabled>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <CircularProgress size={16} />
-                    <Typography variant="body2">Loading languages...</Typography>
+                    <Typography variant="body2">Loading languages from DeepL...</Typography>
                   </Box>
+                </MenuItem>
+              ) : languagesError ? (
+                <MenuItem disabled>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, py: 1 }}>
+                    <Typography variant="body2" color="error">
+                      Failed to load languages
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {languagesError}
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={retryLoadLanguages}
+                      variant="outlined"
+                      sx={{ mt: 1 }}
+                    >
+                      Retry
+                    </Button>
+                  </Box>
+                </MenuItem>
+              ) : availableLanguages.length === 0 ? (
+                <MenuItem disabled>
+                  <Typography variant="body2" color="text.secondary">
+                    No languages available
+                  </Typography>
                 </MenuItem>
               ) : (
                 availableLanguages.map((language) => (
@@ -342,7 +385,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
           onClick={handleSubmit}
           variant="contained"
           startIcon={<AddIcon />}
-          disabled={!text.trim() || selectedLanguages.length === 0}
+          disabled={!text.trim() || selectedLanguages.length === 0 || languagesLoading || !!languagesError || availableLanguages.length === 0}
           sx={{
             background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
             borderRadius: 2,
