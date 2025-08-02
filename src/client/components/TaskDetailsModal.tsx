@@ -179,6 +179,19 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
     return '#ef4444';
   };
 
+  const getGuideDisplayName = (guide?: string) => {
+    if (!guide) return 'No specific guide';
+    
+    // Convert guide type to display name with filename indication
+    const guideMap: Record<string, string> = {
+      'financialtimes': 'Financial Times (financialtimes.txt)',
+      'monzo': 'Monzo (monzo.txt)', 
+      'prolific': 'Prolific (prolific.txt)',
+    };
+    
+    return guideMap[guide] || `${guide} (${guide}.txt)`;
+  };
+
   return (
     <Dialog
       open={open}
@@ -492,6 +505,43 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
         {/* Editorial Guidelines Tab */}
         <TabPanel value={tabValue} index={1}>
           <Box sx={{ px: 4 }}>
+            {/* Guide Information */}
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 3 }}>
+                  Editorial Guide Used
+                </Typography>
+                
+                <Box
+                  sx={{
+                    p: 3,
+                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                    border: '1px solid #fbbf24',
+                    borderRadius: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                  }}
+                >
+                  <GuidelinesIcon sx={{ color: '#d97706', fontSize: 24 }} />
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ color: '#92400e', fontWeight: 600, mb: 0.5 }}>
+                      Guide Source
+                    </Typography>
+                    <Typography variant="body1" sx={{ color: '#78350f', fontWeight: 500 }}>
+                      {getGuideDisplayName(task.guide)}
+                    </Typography>
+                    {task.guide && (
+                      <Typography variant="caption" sx={{ color: '#a16207', mt: 0.5, display: 'block' }}>
+                        Editorial guidelines from {task.guide} style guide
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Editorial Guidelines */}
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 3 }}>
@@ -573,6 +623,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
                         <Typography variant="body1" sx={{ color: '#6b7280', fontStyle: 'italic' }}>
                           No specific editorial guidelines were provided for this translation task.
                         </Typography>
+                        {task.guide && (
+                          <Typography variant="body2" sx={{ color: '#9ca3af', mt: 1 }}>
+                            However, the translation followed the {task.guide} editorial guide standards.
+                          </Typography>
+                        )}
                       </Box>
                     </Grid>
                   )}
