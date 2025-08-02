@@ -19,6 +19,7 @@ export interface TranslationRequest {
   editorialGuidelines: EditorialGuidelines;
   destinationLanguages: string[];
   guide?: GuideType;
+  useFullMarkdown?: boolean;
 }
 
 export type LanguageTaskStatus = 'pending' | 'translating' | 'llm_verification' | 'human_review' | 'done' | 'failed';
@@ -44,6 +45,7 @@ export interface TranslationTask {
   editorialGuidelines: EditorialGuidelines;
   destinationLanguages: string[];
   guide?: GuideType;
+  useFullMarkdown?: boolean;
   result?: TranslationResponse;
   error?: string;
   createdAt: string;
