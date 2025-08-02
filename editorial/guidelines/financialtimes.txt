@@ -1,0 +1,57 @@
+FT SPECIALIST PARTNER CONTENT GUIDE - LLM VERSION
+
+CONTENT REQUIREMENTS:
+- Word count: 500-800 words (excluding T&Cs)
+- Headlines: 60 characters max (including spaces)
+- Style: Native to FT, not press release or brand-forward
+- Written/edited by professional journalist
+- Educational content preferred
+
+ACCURACY RULES:
+- All claims need references/links to facts
+- No malicious/libelous content about people/companies
+- Content must be current/evergreen
+- British English spelling (adviser not advisor)
+
+HEADLINE RULES:
+- Print: Can use puns, short phrases
+- Online: Descriptive for SEO, avoid puns
+- Example: "Sustainable pensions?" → "Is there a future for sustainable pensions?"
+
+FORMAT RULES:
+- 2-sentence paragraphs average online
+- No bold/italics in copy
+- Break content into short sections
+
+HOUSE STYLE:
+- Hyphens: "60-year-olds" not "60 year olds"
+- Numbers: Write one to nine, then figures
+- Percentages: Always figures (1 per cent, 2 per cent)
+- In headlines/bullets: Use % symbol
+- Million = mn, billion = bn
+- Dates: August 16 2017 (no commas)
+- No capitals for job titles or general terms
+- Acronyms: Acas (pronounceable), DWP (not pronounceable)
+- Ranges: £5bn-£10bn not £5-£10bn
+
+IMAGE SPECS:
+- Hero: 1275x717px or 2:1 ratio
+- Landscape only
+- JPG/PNG, RGB 72dpi
+- Logos: 200x200px minimum, 300dpi
+
+VIDEO SPECS:
+- MP4 with thumbnail
+- 200-300 word intro copy
+- Max length: 2'30" (standard), 7'00"+ (documentary)
+
+CONTENT TYPES:
+- The Banker, FTAdviser, Pensions Expert, FDI, PWM can include company logos
+- Don't run same content on competing sites simultaneously
+- Content should be exclusive to FT initially
+- Consider SEO in all content
+
+FORBIDDEN:
+- FT Specialist journalists as authors
+- Heavy brand mentions
+- Content without third-party references

@@ -1,0 +1,69 @@
+PROLIFIC STYLE GUIDE - LLM VERSION
+
+CORE VOICE: ACE (Authoritative, Clear, Energized)
+- Authoritative: Bold, confident, expert tone. Use active voice. Lead with "you" not "we"
+- Clear: Simple, concise, jargon-free. Break up dense text. Accessible to all
+- Energized: Punchy, dynamic. Mix sentence lengths. Use vivid language
+
+PARTICIPANTS VS RESEARCHERS:
+- Researchers: ACE order (Authority first)
+- Participants: ECE order (Energy first, add warmth)
+
+GRAMMAR RULES:
+- American English spelling (color not colour, organize not organise)
+- Sentence case for all headers/buttons
+- Numbers: Write 1-9, use digits for 10+
+- Dates: June 11, 2024 format
+- Times: 11:00 AM format
+- Oxford comma always
+- Contractions encouraged (can't, you're, we'll)
+- Start sentences with But/And/So is fine
+- One exclamation mark max
+- No bold/italic for emphasis
+
+LEGAL REQUIREMENTS:
+- "Participants are paid by researchers via Prolific" NOT "Prolific pays participants"
+- "Prolific helps researchers drive impact" NOT "Prolific creates impact"
+- Use "verification" not "vetting"
+- Use "incentive" not "bonus"
+
+CHANNEL-SPECIFIC RULES:
+
+Website:
+- Focus: Authoritative + Clear
+- Strong action-oriented headlines
+- Short navigation labels/CTAs
+- Avoid niche jargon
+
+Blog/Articles:
+- Focus: Authoritative + Energized
+- Use subheadings
+- Mix storytelling with evidence
+- Accessible technical content
+
+Social Media:
+- LinkedIn: Professional but approachable
+- Facebook/X: Conversational, emojis OK
+- Reddit: Casual, human, no emojis
+
+Email:
+- Customer service: Direct, solutions-focused, bullet points
+- Newsletters: Concise with links to full content
+
+In-app:
+- Focus: Clear + Energized
+- Action-oriented CTAs
+- Minimal text
+- Friendly but efficient
+
+Help Center:
+- Focus: Authoritative + Clear
+- Numbered steps
+- Avoid jargon
+- Include screenshots
+- Anticipate user questions
+
+BANNED TERMS:
+- Leverage → Use
+- Move the needle → Make progress
+- Eat our own dogfood → Use our own products
