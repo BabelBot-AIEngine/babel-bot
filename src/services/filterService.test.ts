@@ -233,15 +233,21 @@ describe("FilterService", () => {
       const newFilterService = new FilterService();
       (newFilterService as any).anthropic = mockAnthropic;
 
-      await expect(
-        newFilterService.getFilterRecommendations(mockRequest)
-      ).rejects.toThrow("Failed to get filter recommendations: API Error");
+      // The refactored service now returns fallback recommendations instead of throwing
+      const result = await newFilterService.getFilterRecommendations(
+        mockRequest
+      );
+
+      expect(result).toBeDefined();
+      expect(result.recommendations).toHaveLength(2); // fallback recommendations
+      expect(result.reasoning).toContain("Fallback recommendations");
+      expect(result.confidence).toBe(60);
 
       process.env.DEMO_MODE = originalEnv;
     });
   });
 
-  describe("parseFilterRecommendations", () => {
+  describe("parseHighQualityResponse", () => {
     it("should parse valid JSON response correctly", () => {
       const mockResponse = `
         Here are my recommendations:
@@ -262,7 +268,7 @@ describe("FilterService", () => {
         }
       `;
 
-      const result = (filterService as any).parseFilterRecommendations(
+      const result = (filterService as any).parseHighQualityResponse(
         mockResponse,
         mockFilters
       );
@@ -277,7 +283,7 @@ describe("FilterService", () => {
     it("should handle malformed JSON gracefully", () => {
       const mockResponse = "This is not valid JSON";
 
-      const result = (filterService as any).parseFilterRecommendations(
+      const result = (filterService as any).parseHighQualityResponse(
         mockResponse,
         mockFilters
       );
@@ -307,7 +313,7 @@ describe("FilterService", () => {
         }
       `;
 
-      const result = (filterService as any).parseFilterRecommendations(
+      const result = (filterService as any).parseHighQualityResponse(
         mockResponse,
         mockFilters
       );
@@ -317,9 +323,9 @@ describe("FilterService", () => {
     });
   });
 
-  describe("buildFilterRecommendationPrompt", () => {
+  describe("buildStructuredPrompt", () => {
     it("should build comprehensive prompt with all context", () => {
-      const prompt = (filterService as any).buildFilterRecommendationPrompt(
+      const prompt = (filterService as any).buildStructuredPrompt(
         {
           article: sampleArticle,
           targetLanguages: ["Spanish"],
@@ -339,7 +345,7 @@ describe("FilterService", () => {
       expect(prompt).toContain("Domain Specific: Yes");
       expect(prompt).toContain("LANGUAGE PROFICIENCY FILTERS:");
       expect(prompt).toContain("spanish-test-score");
-      expect(prompt).toContain("FORMAT YOUR RESPONSE AS JSON:");
+      expect(prompt).toContain("RESPOND WITH VALID JSON ONLY");
     });
 
     it("should handle minimal context gracefully", () => {
@@ -348,7 +354,7 @@ describe("FilterService", () => {
         targetLanguages: ["English"],
       };
 
-      const prompt = (filterService as any).buildFilterRecommendationPrompt(
+      const prompt = (filterService as any).buildStructuredPrompt(
         minimalRequest,
         mockFilters
       );

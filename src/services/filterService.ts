@@ -6,14 +6,20 @@ import {
   FilterRecommendationResponse,
 } from "../types";
 import Anthropic from "@anthropic-ai/sdk";
+import { LLMClassifierFromTemplate } from "autoevals";
 
+/**
+ * Enhanced FilterService using LLM Classifier pattern for reliable response parsing
+ */
 export class FilterService {
   private anthropic?: Anthropic;
   private cachedFilters?: ProlificFilter[];
   private readonly PROLIFIC_API_BASE = "https://api.prolific.com/api/v1";
+  private filterRecommendationClassifier: any;
 
   constructor() {
     this.setup();
+    this.initializeClassifier();
   }
 
   private setup() {
@@ -22,6 +28,53 @@ export class FilterService {
         apiKey: process.env.ANTHROPIC_API_KEY,
       });
     }
+  }
+
+  /**
+   * Initialize the LLM Classifier for filter recommendation parsing
+   */
+  private initializeClassifier() {
+    this.filterRecommendationClassifier = LLMClassifierFromTemplate({
+      name: "Filter Recommendation Classifier",
+      promptTemplate: `
+You are evaluating and parsing filter recommendations for participant recruitment on Prolific. 
+
+[BEGIN DATA]
+************
+[Article Context]: {{{input}}}
+************
+[LLM Response]: {{{output}}}
+************
+[Available Filters]: {{{expected}}}
+************
+[END DATA]
+
+Your task is to parse the LLM response and extract valid filter recommendations. The response should contain:
+1. A list of filter recommendations with filter_id, reasoning, confidence, and recommended_values
+2. Overall reasoning for the recommendation strategy
+3. Overall confidence score
+
+Based on the quality and completeness of the response, classify it as:
+
+(A) Complete and well-structured JSON with all required fields and valid filter_ids
+(B) Valid JSON with minor formatting issues or missing non-critical fields
+(C) Partial JSON or some valid recommendations but missing key information
+(D) Poorly formatted or invalid JSON that requires significant parsing effort
+(E) No valid JSON found or completely unusable response
+
+Select the most appropriate classification based on the parseability and completeness of the filter recommendations.
+      `,
+      choiceScores: {
+        A: 1.0,
+        B: 0.8,
+        C: 0.6,
+        D: 0.3,
+        E: 0.0,
+      },
+      temperature: 0,
+      useCoT: true,
+      model: "claude-3-5-sonnet-20241022",
+    });
   }
 
   /**
@@ -54,7 +107,7 @@ export class FilterService {
   }
 
   /**
-   * Gets intelligent filter recommendations for evaluation tasks using Anthropic LLM
+   * Gets intelligent filter recommendations using structured LLM classification
    */
   async getFilterRecommendations(
     request: FilterRecommendationRequest
@@ -75,22 +128,13 @@ export class FilterService {
       // Fetch available filters
       const availableFilters = await this.fetchAvailableFilters();
 
-      // Build the prompt for the LLM
-      const prompt = this.buildFilterRecommendationPrompt(
+      // Get structured recommendations using the classifier
+      const recommendations = await this.getStructuredRecommendations(
         request,
         availableFilters
       );
 
-      // Get recommendations from Anthropic
-      const response = await this.anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2048,
-        messages: [{ role: "user", content: prompt }],
-      });
-
-      const responseText =
-        response?.content[0].type === "text" ? response?.content[0].text : "";
-      return this.parseFilterRecommendations(responseText, availableFilters);
+      return recommendations;
     } catch (error) {
       console.error("Filter recommendation error:", error);
       throw new Error(
@@ -102,9 +146,84 @@ export class FilterService {
   }
 
   /**
-   * Builds the prompt for the LLM to analyze article and recommend filters
+   * Uses LLM Classifier to get structured filter recommendations
    */
-  private buildFilterRecommendationPrompt(
+  private async getStructuredRecommendations(
+    request: FilterRecommendationRequest,
+    availableFilters: ProlificFilter[]
+  ): Promise<FilterRecommendationResponse> {
+    // Build context for the classifier
+    const articleContext = this.buildArticleContext(request);
+    const filtersContext = this.buildFiltersContext(availableFilters);
+
+    // Create the structured prompt for recommendations
+    const prompt = this.buildStructuredPrompt(request, availableFilters);
+
+    try {
+      // Get response from Anthropic
+      const response = await this.anthropic!.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2048,
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const responseText =
+        response?.content[0].type === "text" ? response?.content[0].text : "";
+
+      // Use classifier to evaluate and parse the response
+      const classificationResult = await this.filterRecommendationClassifier({
+        input: articleContext,
+        output: responseText,
+        expected: filtersContext,
+      });
+
+      // Parse the response based on classification score
+      if (classificationResult.score >= 0.8) {
+        return this.parseHighQualityResponse(responseText, availableFilters);
+      } else if (classificationResult.score >= 0.6) {
+        return this.parsePartialResponse(responseText, availableFilters);
+      } else {
+        console.warn(
+          `Low quality LLM response (score: ${classificationResult.score}), using fallback`
+        );
+        return this.getFallbackRecommendations(availableFilters);
+      }
+    } catch (error) {
+      console.error("Error in structured recommendations:", error);
+      return this.getFallbackRecommendations(availableFilters);
+    }
+  }
+
+  /**
+   * Builds article context for classifier input
+   */
+  private buildArticleContext(request: FilterRecommendationRequest): string {
+    const { article, targetLanguages, evaluationContext } = request;
+    return JSON.stringify({
+      title: article.title || "No title",
+      contentLength: article.text.length,
+      targetLanguages,
+      evaluationContext,
+    });
+  }
+
+  /**
+   * Builds filters context for classifier expected input
+   */
+  private buildFiltersContext(availableFilters: ProlificFilter[]): string {
+    return JSON.stringify(
+      availableFilters.map((f) => ({
+        filter_id: f.filter_id,
+        title: f.title,
+        type: f.type,
+      }))
+    );
+  }
+
+  /**
+   * Builds structured prompt for filter recommendations
+   */
+  private buildStructuredPrompt(
     request: FilterRecommendationRequest,
     availableFilters: ProlificFilter[]
   ): string {
@@ -142,9 +261,26 @@ export class FilterService {
       )
     );
 
-    let prompt = `You are an expert in designing participant recruitment strategies for content evaluation tasks on the Prolific platform. 
+    return `You are an expert in designing participant recruitment strategies for content evaluation tasks on the Prolific platform.
 
-Your task is to analyze an article and recommend the most appropriate Prolific participant filters to ensure high-quality evaluation of translations.
+CRITICAL: You MUST respond with valid JSON in exactly this format:
+{
+  "recommendations": [
+    {
+      "filter_id": "exact-filter-id-from-available-list",
+      "title": "Filter Title",
+      "reasoning": "Detailed explanation",
+      "confidence": 85,
+      "recommended_values": {
+        "choices": ["choice1", "choice2"] // for select filters
+        // OR
+        "min": 75, "max": 100 // for range filters
+      }
+    }
+  ],
+  "reasoning": "Overall strategy explanation",
+  "confidence": 90
+}
 
 ARTICLE TO ANALYZE:
 Title: ${article.title || "No title provided"}
@@ -176,40 +312,12 @@ ${this.formatFiltersForPrompt(qualityFilters)}
 
 INSTRUCTIONS:
 1. Analyze the article's subject matter, complexity, cultural context, and target languages
-2. Consider what type of participants would be best suited to evaluate translations of this content
-3. Recommend 3-7 filters that would ensure high-quality evaluation
-4. For each recommendation, provide:
-   - The filter_id
-   - Clear reasoning for why this filter is important for this specific article
-   - Confidence level (1-100)
-   - Specific recommended values (for range filters) or choices (for select filters)
+2. Recommend 3-7 filters that would ensure high-quality evaluation
+3. Use ONLY filter_ids from the available filters list above
+4. Provide confidence scores between 1-100
+5. Include specific recommended values for each filter
 
-Focus on:
-- Language proficiency requirements for target languages
-- Cultural knowledge needs based on content
-- Educational/professional background relevant to the subject matter
-- Quality assurance measures to ensure reliable evaluators
-
-FORMAT YOUR RESPONSE AS JSON:
-{
-  "recommendations": [
-    {
-      "filter_id": "example-filter",
-      "title": "Filter Title",
-      "reasoning": "Detailed explanation of why this filter is needed",
-      "confidence": 85,
-      "recommended_values": {
-        "choices": ["choice1", "choice2"] // for select filters
-        // OR
-        "min": 75, "max": 100 // for range filters
-      }
-    }
-  ],
-  "reasoning": "Overall strategy explanation",
-  "confidence": 90
-}`;
-
-    return prompt;
+RESPOND WITH VALID JSON ONLY - NO OTHER TEXT:`;
   }
 
   /**
@@ -238,51 +346,99 @@ FORMAT YOUR RESPONSE AS JSON:
   }
 
   /**
-   * Parses the LLM response to extract filter recommendations
+   * Parses high-quality LLM responses (score >= 0.8)
    */
-  private parseFilterRecommendations(
+  private parseHighQualityResponse(
     responseText: string,
     availableFilters: ProlificFilter[]
   ): FilterRecommendationResponse {
     try {
-      // Try to extract JSON from the response
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error("No JSON found in response");
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
+      return this.validateAndEnhanceRecommendations(parsed, availableFilters);
+    } catch (error) {
+      console.error("Error parsing high-quality response:", error);
+      return this.getFallbackRecommendations(availableFilters);
+    }
+  }
 
-      // Validate and enhance recommendations with filter details
-      const validRecommendations: FilterRecommendation[] = [];
+  /**
+   * Parses partial LLM responses (score 0.6-0.8)
+   */
+  private parsePartialResponse(
+    responseText: string,
+    availableFilters: ProlificFilter[]
+  ): FilterRecommendationResponse {
+    try {
+      // Try multiple parsing strategies for partial responses
+      let parsed: any;
 
-      for (const rec of parsed.recommendations || []) {
-        const filter = availableFilters.find(
-          (f) => f.filter_id === rec.filter_id
+      // Strategy 1: Direct JSON parsing
+      try {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        }
+      } catch (e) {
+        // Continue to next strategy
+      }
+
+      // Strategy 2: Extract recommendations array if main JSON fails
+      if (!parsed) {
+        const recommendationsMatch = responseText.match(
+          /"recommendations"\s*:\s*\[[\s\S]*?\]/
         );
-        if (filter) {
-          validRecommendations.push({
-            filter_id: rec.filter_id,
-            title: filter.title,
-            reasoning: rec.reasoning || "No reasoning provided",
-            confidence: Math.min(Math.max(rec.confidence || 50, 1), 100),
-            recommended_values: rec.recommended_values,
-          });
+        if (recommendationsMatch) {
+          const recText = recommendationsMatch[0];
+          parsed = { recommendations: JSON.parse(recText.split(":")[1]) };
         }
       }
 
-      return {
-        recommendations: validRecommendations,
-        reasoning:
-          parsed.reasoning ||
-          "Filter recommendations based on article analysis",
-        confidence: Math.min(Math.max(parsed.confidence || 75, 1), 100),
-      };
+      if (parsed) {
+        return this.validateAndEnhanceRecommendations(parsed, availableFilters);
+      } else {
+        throw new Error("Could not parse partial response");
+      }
     } catch (error) {
-      console.error("Error parsing filter recommendations:", error);
-      // Return fallback recommendations
+      console.error("Error parsing partial response:", error);
       return this.getFallbackRecommendations(availableFilters);
     }
+  }
+
+  /**
+   * Validates and enhances parsed recommendations
+   */
+  private validateAndEnhanceRecommendations(
+    parsed: any,
+    availableFilters: ProlificFilter[]
+  ): FilterRecommendationResponse {
+    const validRecommendations: FilterRecommendation[] = [];
+
+    for (const rec of parsed.recommendations || []) {
+      const filter = availableFilters.find(
+        (f) => f.filter_id === rec.filter_id
+      );
+      if (filter) {
+        validRecommendations.push({
+          filter_id: rec.filter_id,
+          title: filter.title,
+          reasoning: rec.reasoning || "No reasoning provided",
+          confidence: Math.min(Math.max(rec.confidence || 50, 1), 100),
+          recommended_values: rec.recommended_values,
+        });
+      }
+    }
+
+    return {
+      recommendations: validRecommendations,
+      reasoning:
+        parsed.reasoning || "Filter recommendations based on article analysis",
+      confidence: Math.min(Math.max(parsed.confidence || 75, 1), 100),
+    };
   }
 
   /**
@@ -394,5 +550,12 @@ FORMAT YOUR RESPONSE AS JSON:
    */
   clearCache(): void {
     this.cachedFilters = undefined;
+  }
+
+  /**
+   * Gets the classifier for testing purposes
+   */
+  getClassifier() {
+    return this.filterRecommendationClassifier;
   }
 }
