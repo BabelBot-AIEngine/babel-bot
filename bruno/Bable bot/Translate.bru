@@ -1,0 +1,42 @@
+meta {
+  name: Translate
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:3000/api/translate
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "mediaArticle": {
+      "text": "Breaking news: Scientists have discovered a new species of marine life in the deep ocean. This remarkable creature has unique characteristics that could revolutionize our understanding of marine biology.",
+      "title": "New Marine Species Discovery"
+    },
+    "editorialGuidelines": {
+      "tone": "professional",
+      "style": "journalistic",
+      "targetAudience": "general public",
+      "restrictions": [
+        "no technical jargon",
+        "keep sentences under 20 words"
+      ],
+      "requirements": [
+        "include scientific accuracy",
+        "maintain engaging tone"
+      ]
+    },
+    "destinationLanguages": [
+      "es",
+      "fr",
+      "de"
+    ]
+  }
+}
