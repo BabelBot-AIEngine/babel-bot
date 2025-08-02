@@ -40,8 +40,9 @@ import {
   Star as StarIcon,
   StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
-import { TranslationTask } from '../../types';
+import { TranslationTask, LanguageTaskStatus, getLanguageStatesForTask } from '../../types';
 import { getLanguageDisplayName } from '../../utils/languageUtils';
+import TranslationTimeline from './TranslationTimeline';
 
 interface TaskDetailsModalProps {
   task: TranslationTask | null;
@@ -405,23 +406,68 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
                     <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 600, mb: 2 }}>
                       Target Languages
                     </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                      {task.destinationLanguages.map(lang => (
-                        <Chip
-                          key={lang}
-                          label={getLanguageDisplayName(lang)}
-                          sx={{ 
-                            fontSize: '0.875rem',
-                            fontWeight: 600,
-                            background: getStatusGradient(),
-                            color: 'white',
-                            '&:hover': {
-                              transform: 'scale(1.05)',
-                            },
-                            transition: 'transform 0.2s ease',
-                          }}
-                        />
-                      ))}
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                      {task.destinationLanguages.map(lang => {
+                        const languageStates = getLanguageStatesForTask(task);
+                        const langStatus = languageStates.get(lang) || 'pending';
+                        const isFailedLang = langStatus === 'failed';
+                        
+                        const getLanguageStatusGradient = (status: LanguageTaskStatus) => {
+                          switch (status) {
+                            case 'pending':
+                              return 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)';
+                            case 'translating':
+                              return 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)';
+                            case 'llm_verification':
+                              return 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)';
+                            case 'human_review':
+                              return 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)';
+                            case 'done':
+                              return 'linear-gradient(135deg, #10b981 0%, #34d399 100%)';
+                            case 'failed':
+                              return 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)';
+                            default:
+                              return 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
+                          }
+                        };
+                        
+                        return (
+                          <Box key={lang} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                            <Chip
+                              label={getLanguageDisplayName(lang)}
+                              sx={{ 
+                                fontSize: '0.875rem',
+                                fontWeight: 600,
+                                background: getLanguageStatusGradient(langStatus),
+                                color: 'white',
+                                border: isFailedLang ? '2px solid #dc2626' : 'none',
+                                '&:hover': {
+                                  transform: 'scale(1.05)',
+                                },
+                                transition: 'transform 0.2s ease',
+                              }}
+                            />
+                            <Typography variant="caption" sx={{ 
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              color: isFailedLang ? '#dc2626' : '#64748b',
+                              textTransform: 'uppercase',
+                              textAlign: 'center'
+                            }}>
+                              {langStatus.replace('_', ' ')}
+                            </Typography>
+                            {isFailedLang && (
+                              <Box sx={{ 
+                                width: 6, 
+                                height: 6, 
+                                borderRadius: '50%', 
+                                backgroundColor: '#dc2626',
+                                animation: 'pulse 2s infinite'
+                              }} />
+                            )}
+                          </Box>
+                        );
+                      })}
                     </Box>
                   </CardContent>
                 </Card>
@@ -646,54 +692,173 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
                 Translation Results
               </Typography>
               
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {task.result.translations.map((translation, index) => (
-                  <Card key={index} sx={{ overflow: 'visible' }}>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* Translation Status Summary */}
+              <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0' }}>
+                <CardContent>
+                  <Typography variant="subtitle1" sx={{ color: '#1e293b', fontWeight: 600, mb: 2 }}>
+                    Status Overview
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                    {task.result.translations.map((translation, index) => {
+                      const translationStatus = (translation.status || 'done') as LanguageTaskStatus;
+                      const isFailedTranslation = translationStatus === 'failed';
+                      
+                      return (
+                        <Box key={index} sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 1,
+                          p: 1.5,
+                          background: isFailedTranslation 
+                            ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)'
+                            : 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+                          border: `1px solid ${isFailedTranslation ? '#fecaca' : '#bbf7d0'}`,
+                          borderRadius: 2
+                        }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                            {getLanguageDisplayName(translation.language)}:
+                          </Typography>
                           <Chip
-                            label={getLanguageDisplayName(translation.language)}
+                            label={translationStatus.replace('_', ' ').toUpperCase()}
+                            size="small"
                             sx={{
-                              background: getStatusGradient(),
+                              backgroundColor: isFailedTranslation ? '#ef4444' : '#10b981',
                               color: 'white',
                               fontWeight: 600,
-                              fontSize: '0.875rem',
+                              fontSize: '0.7rem'
                             }}
                           />
                           {translation.complianceScore && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <ScoreIcon sx={{ color: getComplianceColor(translation.complianceScore), fontSize: 20 }} />
-                              <Typography variant="body2" sx={{ fontWeight: 600, color: getComplianceColor(translation.complianceScore) }}>
-                                Compliance: {translation.complianceScore}%
-                              </Typography>
-                              <Rating
-                                value={getComplianceRating(translation.complianceScore)}
-                                readOnly
-                                size="small"
-                                sx={{
-                                  '& .MuiRating-iconFilled': {
-                                    color: getComplianceColor(translation.complianceScore),
-                                  },
-                                }}
-                              />
-                            </Box>
+                            <Typography variant="caption" sx={{ 
+                              color: isFailedTranslation ? '#dc2626' : '#059669',
+                              fontWeight: 600 
+                            }}>
+                              ({translation.complianceScore}%)
+                            </Typography>
                           )}
                         </Box>
-                        <IconButton
-                          onClick={() => copyToClipboard(translation.translatedText)}
-                          sx={{
-                            background: 'rgba(99, 102, 241, 0.1)',
-                            '&:hover': {
-                              background: 'rgba(99, 102, 241, 0.2)',
-                            },
-                          }}
-                        >
-                          <CopyIcon sx={{ color: '#6366f1' }} />
-                        </IconButton>
-                      </Box>
+                      );
+                    })}
+                  </Box>
+                  
+                  {/* Quick stats */}
+                  <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid #e2e8f0' }}>
+                    <Box sx={{ display: 'flex', gap: 4 }}>
+                      <Typography variant="body2" sx={{ color: '#059669', fontWeight: 600 }}>
+                        ✓ Successful: {task.result.translations.filter(t => t.status !== 'failed').length}
+                      </Typography>
+                      {task.result.translations.some(t => t.status === 'failed') && (
+                        <Typography variant="body2" sx={{ color: '#dc2626', fontWeight: 600 }}>
+                          ✗ Failed: {task.result.translations.filter(t => t.status === 'failed').length}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+              
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {task.result.translations.map((translation, index) => {
+                  const translationStatus = (translation.status || 'done') as LanguageTaskStatus;
+                  const isFailedTranslation = translationStatus === 'failed';
+                  
+                  return (
+                    <Card 
+                      key={index} 
+                      sx={{ 
+                        overflow: 'visible',
+                        border: isFailedTranslation ? '2px solid #ef4444' : '1px solid #e2e8f0',
+                        background: isFailedTranslation 
+                          ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' 
+                          : 'white'
+                      }}
+                    >
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Chip
+                              label={getLanguageDisplayName(translation.language)}
+                              sx={{
+                                background: isFailedTranslation 
+                                  ? 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)'
+                                  : getStatusGradient(),
+                                color: 'white',
+                                fontWeight: 600,
+                                fontSize: '0.875rem',
+                              }}
+                            />
+                            {isFailedTranslation && (
+                              <Chip
+                                label="FAILED"
+                                size="small"
+                                sx={{
+                                  backgroundColor: '#dc2626',
+                                  color: 'white',
+                                  fontWeight: 700,
+                                  fontSize: '0.75rem',
+                                  animation: 'pulse 2s infinite'
+                                }}
+                              />
+                            )}
+                            {translation.complianceScore && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <ScoreIcon sx={{ color: getComplianceColor(translation.complianceScore), fontSize: 20 }} />
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: getComplianceColor(translation.complianceScore) }}>
+                                  Compliance: {translation.complianceScore}%
+                                </Typography>
+                                <Rating
+                                  value={getComplianceRating(translation.complianceScore)}
+                                  readOnly
+                                  size="small"
+                                  sx={{
+                                    '& .MuiRating-iconFilled': {
+                                      color: getComplianceColor(translation.complianceScore),
+                                    },
+                                  }}
+                                />
+                              </Box>
+                            )}
+                          </Box>
+                          <IconButton
+                            onClick={() => copyToClipboard(translation.translatedText)}
+                            sx={{
+                              background: 'rgba(99, 102, 241, 0.1)',
+                              '&:hover': {
+                                background: 'rgba(99, 102, 241, 0.2)',
+                              },
+                            }}
+                          >
+                            <CopyIcon sx={{ color: '#6366f1' }} />
+                          </IconButton>
+                        </Box>
 
-                      <Box
+                        {/* Translation Timeline */}
+                        <TranslationTimeline 
+                          currentStatus={translationStatus}
+                          language={getLanguageDisplayName(translation.language)}
+                        />
+                        
+                        {/* Alert box for failed translations */}
+                        {isFailedTranslation && (
+                          <Box sx={{
+                            p: 2,
+                            mt: 2,
+                            background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                            border: '1px solid #f87171',
+                            borderRadius: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1
+                          }}>
+                            <ErrorIcon sx={{ color: '#dc2626', fontSize: 20 }} />
+                            <Typography variant="body2" sx={{ color: '#7f1d1d', fontWeight: 600 }}>
+                              This translation failed during processing. Please check the review notes below for details.
+                            </Typography>
+                          </Box>
+                        )}
+
+                        <Box
                         sx={{
                           p: 3,
                           background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
@@ -732,9 +897,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ task, open, onClose
                           </AccordionDetails>
                         </Accordion>
                       )}
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </Box>
 
               {task.result.processedAt && (
