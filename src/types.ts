@@ -40,6 +40,7 @@ export interface TranslationTask {
   mediaArticle: MediaArticle;
   editorialGuidelines: EditorialGuidelines;
   destinationLanguages: string[];
+  guide?: GuideType;
   result?: TranslationResponse;
   error?: string;
   createdAt: string;
