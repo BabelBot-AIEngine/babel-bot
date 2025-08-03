@@ -84,7 +84,7 @@ export class DatabaseService {
     }
 
     const now = new Date().toISOString();
-    const updateData: Record<string, string> = {
+    const updateData: Record<string, any> = {
       updatedAt: now,
     };
 
@@ -184,65 +184,23 @@ export class DatabaseService {
     return tasks;
   }
 
-  private mapRedisDataToTask(data: Record<string, string>): TranslationTask {
-    const safeJsonParse = (
-      field: string,
-      value: string,
-      defaultValue: any = null
-    ) => {
-      try {
-        if (!value || value === "") return defaultValue;
-        if (value === "[object Object]") {
-          console.error(
-            `Invalid JSON detected in field '${field}': "${value}"`
-          );
-          return defaultValue;
-        }
-        return JSON.parse(value);
-      } catch (error) {
-        console.error(
-          `Failed to parse JSON for field '${field}': "${value}"`,
-          error
-        );
-        return defaultValue;
-      }
-    };
+  private mapRedisDataToTask(data: Record<string, any>): TranslationTask {
+    // Upstash Redis properly deserializes JSON objects, no special handling needed
 
     return {
       id: data.id,
       status: data.status as TranslationTask["status"],
-      mediaArticle: safeJsonParse("mediaArticle", data.mediaArticle, {
-        text: "",
-        title: "",
-        metadata: {},
-      }),
-      editorialGuidelines: safeJsonParse(
-        "editorialGuidelines",
-        data.editorialGuidelines,
-        {}
-      ),
-      destinationLanguages: safeJsonParse(
-        "destinationLanguages",
-        data.destinationLanguages,
-        []
-      ),
-      result: data.result
-        ? safeJsonParse("result", data.result, undefined)
-        : undefined,
+      mediaArticle: data.mediaArticle || { text: "", title: "", metadata: {} },
+      editorialGuidelines: data.editorialGuidelines || {},
+      destinationLanguages: data.destinationLanguages || [],
+      result: data.result || undefined,
       error: data.error || undefined,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
       progress: parseInt(data.progress) || 0,
       guide:
         data.guide && data.guide !== "" ? (data.guide as GuideType) : undefined,
-      humanReviewBatches:
-        data.humanReviewBatches && data.humanReviewBatches !== ""
-          ? safeJsonParse(
-              "humanReviewBatches",
-              data.humanReviewBatches,
-              undefined
-            )
-          : undefined,
+      humanReviewBatches: data.humanReviewBatches || undefined,
     };
   }
 
