@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   root: "src/client",
+  envDir: "../../", // Look for .env files in the project root
   build: {
     outDir: "../../dist/client",
     emptyOutDir: true,

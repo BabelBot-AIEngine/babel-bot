@@ -185,13 +185,50 @@ export class DatabaseService {
   }
 
   private mapRedisDataToTask(data: Record<string, string>): TranslationTask {
+    const safeJsonParse = (
+      field: string,
+      value: string,
+      defaultValue: any = null
+    ) => {
+      try {
+        if (!value || value === "") return defaultValue;
+        if (value === "[object Object]") {
+          console.error(
+            `Invalid JSON detected in field '${field}': "${value}"`
+          );
+          return defaultValue;
+        }
+        return JSON.parse(value);
+      } catch (error) {
+        console.error(
+          `Failed to parse JSON for field '${field}': "${value}"`,
+          error
+        );
+        return defaultValue;
+      }
+    };
+
     return {
       id: data.id,
       status: data.status as TranslationTask["status"],
-      mediaArticle: JSON.parse(data.mediaArticle),
-      editorialGuidelines: JSON.parse(data.editorialGuidelines),
-      destinationLanguages: JSON.parse(data.destinationLanguages),
-      result: data.result ? JSON.parse(data.result) : undefined,
+      mediaArticle: safeJsonParse("mediaArticle", data.mediaArticle, {
+        text: "",
+        title: "",
+        metadata: {},
+      }),
+      editorialGuidelines: safeJsonParse(
+        "editorialGuidelines",
+        data.editorialGuidelines,
+        {}
+      ),
+      destinationLanguages: safeJsonParse(
+        "destinationLanguages",
+        data.destinationLanguages,
+        []
+      ),
+      result: data.result
+        ? safeJsonParse("result", data.result, undefined)
+        : undefined,
       error: data.error || undefined,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
@@ -200,7 +237,11 @@ export class DatabaseService {
         data.guide && data.guide !== "" ? (data.guide as GuideType) : undefined,
       humanReviewBatches:
         data.humanReviewBatches && data.humanReviewBatches !== ""
-          ? JSON.parse(data.humanReviewBatches)
+          ? safeJsonParse(
+              "humanReviewBatches",
+              data.humanReviewBatches,
+              undefined
+            )
           : undefined,
     };
   }

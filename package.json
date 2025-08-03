@@ -25,6 +25,8 @@
   "license": "ISC",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.57.0",
+    "@clerk/clerk-react": "^5.38.1",
+    "@clerk/clerk-sdk-node": "^4.13.23",
     "@dotenvx/dotenvx": "^1.48.4",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

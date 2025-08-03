@@ -4,6 +4,7 @@ import helmet from "helmet";
 import "@dotenvx/dotenvx/config";
 import path from "path";
 import translationRoutes from "./routes/translation";
+import { requireAuth } from "./middleware/auth";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,10 +26,7 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-app.use("/api", translationRoutes);
-
-app.use(express.static(path.join(__dirname, "../dist/client")));
-
+// Public API info endpoint (no auth required)
 app.get("/api", (req, res) => {
   res.json({
     message: "Babel Bot Translation API",
@@ -43,8 +41,14 @@ app.get("/api", (req, res) => {
       filterRecommendations: "POST /api/filters/recommendations",
       filterTest: "POST /api/filters/test",
     },
+    note: "All endpoints require authentication with @prolific.com email domain",
   });
 });
+
+// Apply authentication middleware to all API routes
+app.use("/api", requireAuth, translationRoutes);
+
+app.use(express.static(path.join(__dirname, "../dist/client")));
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist/client/index.html"));
