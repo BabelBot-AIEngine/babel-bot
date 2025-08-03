@@ -30,44 +30,46 @@ export class TranslationService {
     }
   }
 
-  async getAvailableLanguages(): Promise<Array<{ code: string; name: string }>> {
+  async getAvailableLanguages(): Promise<
+    Array<{ code: string; name: string }>
+  > {
     this.setup();
     const isDemoMode = process.env.DEMO_MODE === "true";
 
     if (isDemoMode) {
       // In demo mode, simulate actual DeepL supported languages with proper codes
       return [
-        { code: 'BG', name: 'Bulgarian' },
-        { code: 'CS', name: 'Czech' },
-        { code: 'DA', name: 'Danish' },
-        { code: 'DE', name: 'German' },
-        { code: 'EL', name: 'Greek' },
-        { code: 'EN-GB', name: 'English (British)' },
-        { code: 'EN-US', name: 'English (American)' },
-        { code: 'ES', name: 'Spanish' },
-        { code: 'ET', name: 'Estonian' },
-        { code: 'FI', name: 'Finnish' },
-        { code: 'FR', name: 'French' },
-        { code: 'HU', name: 'Hungarian' },
-        { code: 'ID', name: 'Indonesian' },
-        { code: 'IT', name: 'Italian' },
-        { code: 'JA', name: 'Japanese' },
-        { code: 'KO', name: 'Korean' },
-        { code: 'LT', name: 'Lithuanian' },
-        { code: 'LV', name: 'Latvian' },
-        { code: 'NB', name: 'Norwegian (Bokmål)' },
-        { code: 'NL', name: 'Dutch' },
-        { code: 'PL', name: 'Polish' },
-        { code: 'PT-BR', name: 'Portuguese (Brazilian)' },
-        { code: 'PT-PT', name: 'Portuguese (European)' },
-        { code: 'RO', name: 'Romanian' },
-        { code: 'RU', name: 'Russian' },
-        { code: 'SK', name: 'Slovak' },
-        { code: 'SL', name: 'Slovenian' },
-        { code: 'SV', name: 'Swedish' },
-        { code: 'TR', name: 'Turkish' },
-        { code: 'UK', name: 'Ukrainian' },
-        { code: 'ZH', name: 'Chinese (Simplified)' }
+        { code: "BG", name: "Bulgarian" },
+        { code: "CS", name: "Czech" },
+        { code: "DA", name: "Danish" },
+        { code: "DE", name: "German" },
+        { code: "EL", name: "Greek" },
+        { code: "EN-GB", name: "English (British)" },
+        { code: "EN-US", name: "English (American)" },
+        { code: "ES", name: "Spanish" },
+        { code: "ET", name: "Estonian" },
+        { code: "FI", name: "Finnish" },
+        { code: "FR", name: "French" },
+        { code: "HU", name: "Hungarian" },
+        { code: "ID", name: "Indonesian" },
+        { code: "IT", name: "Italian" },
+        { code: "JA", name: "Japanese" },
+        { code: "KO", name: "Korean" },
+        { code: "LT", name: "Lithuanian" },
+        { code: "LV", name: "Latvian" },
+        { code: "NB", name: "Norwegian (Bokmål)" },
+        { code: "NL", name: "Dutch" },
+        { code: "PL", name: "Polish" },
+        { code: "PT-BR", name: "Portuguese (Brazilian)" },
+        { code: "PT-PT", name: "Portuguese (European)" },
+        { code: "RO", name: "Romanian" },
+        { code: "RU", name: "Russian" },
+        { code: "SK", name: "Slovak" },
+        { code: "SL", name: "Slovenian" },
+        { code: "SV", name: "Swedish" },
+        { code: "TR", name: "Turkish" },
+        { code: "UK", name: "Ukrainian" },
+        { code: "ZH", name: "Chinese (Simplified)" },
       ];
     }
 
@@ -76,9 +78,9 @@ export class TranslationService {
     }
 
     const languages = await this.translator.getTargetLanguages();
-    return languages.map(lang => ({
+    return languages.map((lang) => ({
       code: lang.code,
-      name: lang.name
+      name: lang.name,
     }));
   }
 
@@ -88,15 +90,20 @@ export class TranslationService {
     destinationLanguages: string[],
     guide?: GuideType,
     useFullMarkdown?: boolean
-  ): Promise<TranslationResult[]> {
+  ): Promise<[TranslationResult[], string]> {
     const results: TranslationResult[] = [];
     this.setup();
+    console.log("guide", guide);
+    console.log("useFullMarkdown", useFullMarkdown);
 
-    const { effectiveGuidelines, contextText } = await this.loadGuidelinesByType(
-      guide || "financialtimes",
-      guidelines,
-      useFullMarkdown
-    );
+    const { effectiveGuidelines, contextText } =
+      await this.loadGuidelinesByType(
+        guide || "financialtimes",
+        guidelines,
+        useFullMarkdown
+      );
+    console.log("contextText", contextText);
+    console.log("effectiveGuidelines", effectiveGuidelines);
 
     for (const language of destinationLanguages) {
       const translatedText = await this.performTranslation(
@@ -119,14 +126,17 @@ export class TranslationService {
       });
     }
 
-    return results;
+    return [results, contextText];
   }
 
   private async loadGuidelinesByType(
     guide: GuideType,
     fallbackGuidelines: EditorialGuidelines,
     useFullMarkdown?: boolean
-  ): Promise<{ effectiveGuidelines: EditorialGuidelines; contextText: string }> {
+  ): Promise<{
+    effectiveGuidelines: EditorialGuidelines;
+    contextText: string;
+  }> {
     try {
       const fileExtension = useFullMarkdown ? "md" : "txt";
       const guidelinePath = path.join(
@@ -135,7 +145,7 @@ export class TranslationService {
         "guidelines",
         `${guide}.${fileExtension}`
       );
-      
+
       let fileContent: string;
       try {
         fileContent = fs.readFileSync(guidelinePath, "utf-8");
@@ -152,17 +162,21 @@ export class TranslationService {
 
       let effectiveGuidelines: EditorialGuidelines;
       if (useFullMarkdown) {
-        effectiveGuidelines = this.parseMarkdownGuidelines(fileContent, fallbackGuidelines);
+        effectiveGuidelines = this.parseMarkdownGuidelines(
+          fileContent,
+          fallbackGuidelines
+        );
       } else {
         effectiveGuidelines = { ...fallbackGuidelines };
       }
 
       let contextText = fileContent;
-      
+
       const hasOverrides = Object.keys(fallbackGuidelines).some(
-        key => fallbackGuidelines[key as keyof EditorialGuidelines] !== undefined
+        (key) =>
+          fallbackGuidelines[key as keyof EditorialGuidelines] !== undefined
       );
-      
+
       if (hasOverrides) {
         contextText += "\n\n--- EDITORIAL OVERRIDES ---\n\n";
         if (fallbackGuidelines.tone) {
@@ -175,10 +189,14 @@ export class TranslationService {
           contextText += `Target Audience Override: ${fallbackGuidelines.targetAudience}\n`;
         }
         if (fallbackGuidelines.restrictions?.length) {
-          contextText += `Restrictions Override: ${fallbackGuidelines.restrictions.join(", ")}\n`;
+          contextText += `Restrictions Override: ${fallbackGuidelines.restrictions.join(
+            ", "
+          )}\n`;
         }
         if (fallbackGuidelines.requirements?.length) {
-          contextText += `Requirements Override: ${fallbackGuidelines.requirements.join(", ")}\n`;
+          contextText += `Requirements Override: ${fallbackGuidelines.requirements.join(
+            ", "
+          )}\n`;
         }
       }
 
@@ -188,7 +206,7 @@ export class TranslationService {
         `Could not load guidelines for ${guide}, using fallback:`,
         error
       );
-      
+
       let contextText = "Using fallback editorial guidelines.\n\n";
       if (fallbackGuidelines.tone) {
         contextText += `Tone: ${fallbackGuidelines.tone}\n`;
@@ -200,12 +218,16 @@ export class TranslationService {
         contextText += `Target Audience: ${fallbackGuidelines.targetAudience}\n`;
       }
       if (fallbackGuidelines.restrictions?.length) {
-        contextText += `Restrictions: ${fallbackGuidelines.restrictions.join(", ")}\n`;
+        contextText += `Restrictions: ${fallbackGuidelines.restrictions.join(
+          ", "
+        )}\n`;
       }
       if (fallbackGuidelines.requirements?.length) {
-        contextText += `Requirements: ${fallbackGuidelines.requirements.join(", ")}\n`;
+        contextText += `Requirements: ${fallbackGuidelines.requirements.join(
+          ", "
+        )}\n`;
       }
-      
+
       return { effectiveGuidelines: fallbackGuidelines, contextText };
     }
   }
@@ -274,9 +296,10 @@ export class TranslationService {
 
     try {
       const translateOptions: any = {
-        context: context || undefined
+        context: context || undefined,
       };
-      
+
+      console.log("translateOptions", translateOptions);
       const result = await this.translator?.translateText(
         text,
         null,
