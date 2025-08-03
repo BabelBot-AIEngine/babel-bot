@@ -66,13 +66,14 @@ export class TaskService {
 
       await this.sleep(1000);
 
-      const translations = await this.translationService.translateArticle(
-        task.mediaArticle,
-        task.editorialGuidelines,
-        task.destinationLanguages,
-        task.guide,
-        task.useFullMarkdown
-      );
+      const [translations, contextText] =
+        await this.translationService.translateArticle(
+          task.mediaArticle,
+          task.editorialGuidelines,
+          task.destinationLanguages,
+          task.guide,
+          task.useFullMarkdown
+        );
 
       await this.dbService.updateTask(taskId, {
         status: "llm_verification",
@@ -83,7 +84,8 @@ export class TaskService {
 
       const verifiedTranslations = await this.verifyTranslations(
         translations,
-        task.editorialGuidelines
+        task.editorialGuidelines,
+        contextText
       );
 
       const result: TranslationResponse = {
@@ -116,7 +118,8 @@ export class TaskService {
 
   private async verifyTranslations(
     translations: any[],
-    guidelines: EditorialGuidelines
+    guidelines: EditorialGuidelines,
+    contextText: string
   ): Promise<any[]> {
     const verifiedTranslations = [];
 
@@ -124,7 +127,8 @@ export class TaskService {
       // Call reviewAgainstGuidelines for verification
       const reviewResult = await this.reviewService.reviewAgainstGuidelines(
         translation.translatedText,
-        guidelines
+        guidelines,
+        contextText
       );
 
       const complianceScore = reviewResult.score;

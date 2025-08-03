@@ -1,0 +1,44 @@
+meta {
+  name: Get Available Filters
+  type: http
+  seq: 3
+}
+
+get {
+  url: http://localhost:3000/api/filters
+  body: none
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+docs {
+  # Get Available Filters
+  
+  Fetches all available Prolific filters that can be used for participant recruitment.
+  
+  ## Response
+  - `filters`: Array of available filter objects
+  - `count`: Number of available filters
+  - `timestamp`: When the request was processed
+  
+  ## Example Response
+  ```json
+  {
+    "filters": [
+      {
+        "filter_id": "age",
+        "title": "Age",
+        "description": "Participant age range",
+        "type": "range",
+        "min": 18,
+        "max": 100
+      }
+    ],
+    "count": 1,
+    "timestamp": "2024-01-01T12:00:00.000Z"
+  }
+  ```
+}
