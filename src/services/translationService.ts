@@ -8,13 +8,69 @@ import * as deepl from "deepl-node";
 import * as fs from "fs";
 import * as path from "path";
 import { ReviewService } from "./reviewService";
+import { LLMClassifierFromTemplate } from "autoevals";
 
+/**
+ * Enhanced TranslationService using LLM Classifier pattern for translation quality assessment
+ */
 export class TranslationService {
   private translator?: deepl.Translator;
   private reviewService: ReviewService;
+  private translationQualityClassifier: any;
 
   constructor() {
     this.reviewService = new ReviewService();
+    this.initializeClassifier();
+  }
+
+  /**
+   * Initialize the LLM Classifier for translation quality assessment
+   */
+  private initializeClassifier() {
+    this.translationQualityClassifier = LLMClassifierFromTemplate({
+      name: "Translation Quality Classifier",
+      promptTemplate: `
+You are evaluating the quality of a translation and how well it incorporates provided editorial context and guidelines.
+
+[BEGIN DATA]
+************
+[Original Text]: {{{input}}}
+************
+[Translation]: {{{output}}}
+************
+[Editorial Context & Guidelines]: {{{expected}}}
+************
+[END DATA]
+
+Your task is to evaluate how well the translation incorporates the editorial guidelines and context provided. Consider:
+
+1. **Editorial Guidelines Adherence**: Does the translation follow the specified tone, style, and target audience requirements?
+2. **Context Utilization**: Are editorial overrides and specific requirements properly reflected?
+3. **Translation Quality**: Is the translation accurate, natural, and appropriate for the target language?
+4. **Consistency**: Does the translation maintain consistency with the editorial voice and brand guidelines?
+5. **Cultural Appropriateness**: Is the translation culturally appropriate for the target audience?
+
+Based on the quality and adherence to guidelines, classify the translation as:
+
+(A) Excellent translation that fully incorporates all editorial guidelines and context with high accuracy
+(B) Good translation with minor issues but generally follows guidelines and context well
+(C) Acceptable translation but missing some context elements or guideline adherence
+(D) Poor translation with significant issues in guideline adherence or context utilization
+(E) Unacceptable translation that largely ignores provided context and editorial guidelines
+
+Select the most appropriate classification based on the translation's quality and adherence to the provided editorial context.
+      `,
+      choiceScores: {
+        A: 1.0,
+        B: 0.8,
+        C: 0.6,
+        D: 0.3,
+        E: 0.0,
+      },
+      temperature: 0,
+      useCoT: true,
+      model: "claude-3-5-sonnet-20241022",
+    });
   }
 
   setup() {
@@ -111,18 +167,35 @@ export class TranslationService {
         language,
         contextText
       );
+
+      // Use LLM Classifier to assess translation quality and context adherence
+      const qualityAssessment = await this.assessTranslationQuality(
+        article.text,
+        translatedText,
+        contextText,
+        language
+      );
+
+      // Get traditional review as well for comprehensive evaluation
       const reviewResult = await this.reviewService.reviewAgainstGuidelines(
         translatedText,
         effectiveGuidelines,
         contextText
       );
-      const complianceScore = reviewResult.score;
+
+      // Combine scores for overall compliance assessment
+      const combinedScore = Math.round(
+        (qualityAssessment.score * 100 + reviewResult.score) / 2
+      );
 
       results.push({
         language,
         translatedText,
-        reviewNotes: reviewResult.notes,
-        complianceScore,
+        reviewNotes: this.combineReviewNotes(
+          reviewResult.notes,
+          qualityAssessment.notes
+        ),
+        complianceScore: combinedScore,
       });
     }
 
@@ -282,6 +355,110 @@ export class TranslationService {
     return guidelines;
   }
 
+  /**
+   * Assess translation quality using LLM Classifier
+   */
+  private async assessTranslationQuality(
+    originalText: string,
+    translatedText: string,
+    contextText: string,
+    language: string
+  ): Promise<{ score: number; notes: string }> {
+    const isDemoMode = process.env.DEMO_MODE === "true";
+
+    if (isDemoMode) {
+      // Provide demo assessment
+      return {
+        score: 0.85,
+        notes: `Demo quality assessment for ${language} translation. Context adherence: Good. Editorial guidelines: Followed.`,
+      };
+    }
+
+    try {
+      // Use the classifier to evaluate translation quality
+      const classificationResult = await this.translationQualityClassifier({
+        input: originalText,
+        output: translatedText,
+        expected: contextText,
+      });
+
+      const qualityNotes = this.generateQualityNotes(
+        classificationResult.score,
+        language,
+        classificationResult.reasoning || ""
+      );
+
+      return {
+        score: classificationResult.score,
+        notes: qualityNotes,
+      };
+    } catch (error) {
+      console.error("Error in translation quality assessment:", error);
+      // Fallback to neutral assessment
+      return {
+        score: 0.7,
+        notes: `Quality assessment unavailable for ${language} translation. Manual review recommended.`,
+      };
+    }
+  }
+
+  /**
+   * Generate quality assessment notes based on classifier score
+   */
+  private generateQualityNotes(
+    score: number,
+    language: string,
+    reasoning: string
+  ): string {
+    let qualityLevel: string;
+    let recommendations: string;
+
+    if (score >= 0.9) {
+      qualityLevel = "Excellent";
+      recommendations =
+        "Translation meets all editorial standards and context requirements.";
+    } else if (score >= 0.8) {
+      qualityLevel = "Good";
+      recommendations =
+        "Translation is well-executed with minor areas for improvement.";
+    } else if (score >= 0.6) {
+      qualityLevel = "Acceptable";
+      recommendations =
+        "Translation is adequate but may benefit from editorial review for context adherence.";
+    } else if (score >= 0.3) {
+      qualityLevel = "Poor";
+      recommendations =
+        "Translation has significant issues with guideline adherence. Revision recommended.";
+    } else {
+      qualityLevel = "Unacceptable";
+      recommendations =
+        "Translation does not meet editorial standards. Complete revision required.";
+    }
+
+    let notes = `Quality Assessment (${language}): ${qualityLevel} (${Math.round(
+      score * 100
+    )}%). ${recommendations}`;
+
+    if (reasoning) {
+      notes += ` Detailed analysis: ${reasoning}`;
+    }
+
+    return notes;
+  }
+
+  /**
+   * Combine review notes from traditional review and quality assessment
+   */
+  private combineReviewNotes(
+    reviewNotes: string[],
+    qualityNotes: string
+  ): string[] {
+    const combinedNotes = [qualityNotes];
+    combinedNotes.push("Traditional Review:");
+    combinedNotes.push(...reviewNotes);
+    return combinedNotes;
+  }
+
   private async performTranslation(
     text: string,
     language: string,
@@ -311,5 +488,12 @@ export class TranslationService {
       console.error(`Translation error for language ${language}:`, error);
       return `Translation error for language ${language}: ${error}`;
     }
+  }
+
+  /**
+   * Gets the translation quality classifier for testing purposes
+   */
+  getQualityClassifier() {
+    return this.translationQualityClassifier;
   }
 }
