@@ -295,29 +295,6 @@ export class ProlificService {
     );
   }
 
-  async pollStudyUntilComplete(
-    studyId: string,
-    maxAttempts: number = 60,
-    intervalMs: number = 30000
-  ): Promise<Study> {
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const study = await this.getStudy(studyId);
-
-      if (study.status === "AWAITING_REVIEW" || study.status === "COMPLETED") {
-        return study;
-      }
-
-      // Wait before next check
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
-    }
-
-    throw new Error(
-      `Study ${studyId} did not reach completion status within ${
-        (maxAttempts * intervalMs) / 1000
-      } seconds`
-    );
-  }
-
   async checkStudyStatusAndGetResponses(
     studyId: string,
     batchId: string
@@ -363,7 +340,7 @@ export class ProlificService {
 
     if (!response.ok) {
       throw new Error(
-        `Prolific API error: ${response.status} ${response.statusText}`
+        `Prolific API error: ${response.status} ${response.statusText} ${response.text}`
       );
     }
 

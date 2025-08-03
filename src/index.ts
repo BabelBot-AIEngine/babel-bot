@@ -5,9 +5,6 @@ import "@dotenvx/dotenvx/config";
 import path from "path";
 import translationRoutes from "./routes/translation";
 import { TaskService } from "./services/taskService";
-import { DatabaseService } from "./database/dbService";
-import { ProlificService } from "./services/prolificService";
-import { TranslationService } from "./services/translationService";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,21 +47,19 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist/client/index.html"));
 });
 
+// Initialize services for graceful shutdown
 const taskService = new TaskService();
 
-// Start the study polling mechanism
-const studyPollingInterval = taskService.startStudyPolling(60000); // Poll every minute
-
-// Graceful shutdown
+// Graceful shutdown - stop all study polling
 process.on("SIGTERM", () => {
   console.log("SIGTERM received, shutting down gracefully");
-  taskService.stopStudyPolling(studyPollingInterval);
+  taskService.stopAllStudyPolling();
   process.exit(0);
 });
 
 process.on("SIGINT", () => {
   console.log("SIGINT received, shutting down gracefully");
-  taskService.stopStudyPolling(studyPollingInterval);
+  taskService.stopAllStudyPolling();
   process.exit(0);
 });
 
@@ -72,5 +67,4 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`📚 API documentation available at http://localhost:${PORT}/api`);
   console.log(`🎨 UI available at http://localhost:${PORT}`);
-  console.log(`🔄 Study polling started (60s interval)`);
 });
