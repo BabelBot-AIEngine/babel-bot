@@ -1,0 +1,80 @@
+meta {
+  name: Get Filter Recommendations
+  type: http
+  seq: 4
+}
+
+post {
+  url: http://localhost:3000/api/filters/recommendations
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "article": {
+      "title": "Spanish Cuisine: A Culinary Journey",
+      "text": "Spanish cuisine is renowned worldwide for its rich flavors and diverse regional specialties. From the famous paella of Valencia to the pintxos of the Basque Country, each region offers unique culinary traditions that reflect local ingredients and cultural influences. The Mediterranean climate provides abundant olive oil, fresh seafood, and vibrant vegetables that form the foundation of Spanish cooking.",
+      "metadata": {
+        "category": "food",
+        "region": "Europe",
+        "complexity": "intermediate"
+      }
+    },
+    "targetLanguages": ["Spanish", "French"],
+    "evaluationContext": {
+      "taskType": "translation_quality",
+      "expertiseLevel": "intermediate",
+      "domainSpecific": false
+    }
+  }
+}
+
+docs {
+  # Get Filter Recommendations
+  
+  Gets intelligent filter recommendations for participant recruitment based on article content and evaluation context.
+  
+  ## Request Body
+  - `article`: Object containing the article to be evaluated
+    - `title`: Article title (optional)
+    - `text`: Article content (required)
+    - `metadata`: Additional metadata (optional)
+  - `targetLanguages`: Array of target languages for translation (required)
+  - `evaluationContext`: Optional context for evaluation
+    - `taskType`: Type of evaluation task
+    - `expertiseLevel`: Required expertise level
+    - `domainSpecific`: Whether domain expertise is needed
+  
+  ## Response
+  - `recommendations`: Array of filter recommendations
+  - `reasoning`: Overall strategy explanation
+  - `confidence`: Overall confidence score (1-100)
+  - `timestamp`: When the request was processed
+  - `requestInfo`: Summary of the request parameters
+  
+  ## Example Response
+  ```json
+  {
+    "recommendations": [
+      {
+        "filter_id": "spanish-test-score",
+        "title": "Spanish Test Score",
+        "reasoning": "Native Spanish proficiency needed for accurate evaluation",
+        "confidence": 90,
+        "recommended_values": {
+          "min": 80,
+          "max": 100
+        }
+      }
+    ],
+    "reasoning": "Language proficiency is crucial for translation quality evaluation",
+    "confidence": 85,
+    "timestamp": "2024-01-01T12:00:00.000Z"
+  }
+  ```
+}

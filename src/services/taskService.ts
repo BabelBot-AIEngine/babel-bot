@@ -1,5 +1,8 @@
 import { DatabaseService, TranslationTask } from "../database/dbService";
 import { TranslationService } from "./translationService";
+import { ProlificService } from "./prolificService";
+import { HumanReviewConfigService } from "./humanReviewConfig";
+import { CsvGeneratorService } from "./csvGenerator";
 import { ReviewService } from "./reviewService";
 import { TaskQueue } from "./taskQueue";
 import {
@@ -7,17 +10,25 @@ import {
   EditorialGuidelines,
   TranslationResponse,
   GuideType,
+  TranslationResult,
+  HumanReviewBatch,
 } from "../types";
+import {
+  CreateStudyRequest,
+  CreateBatchInstructionsRequest,
+} from "../types/prolific";
 
 export class TaskService {
   private dbService: DatabaseService;
   private translationService: TranslationService;
+  private prolificService: ProlificService;
   private reviewService: ReviewService;
   private taskQueue?: TaskQueue;
 
   constructor(taskQueue?: TaskQueue) {
     this.dbService = new DatabaseService();
     this.translationService = new TranslationService();
+    this.prolificService = new ProlificService();
     this.reviewService = new ReviewService();
     this.taskQueue = taskQueue;
   }
@@ -66,13 +77,14 @@ export class TaskService {
 
       await this.sleep(1000);
 
-      const translations = await this.translationService.translateArticle(
-        task.mediaArticle,
-        task.editorialGuidelines,
-        task.destinationLanguages,
-        task.guide,
-        task.useFullMarkdown
-      );
+      const [translations, contextText] =
+        await this.translationService.translateArticle(
+          task.mediaArticle,
+          task.editorialGuidelines,
+          task.destinationLanguages,
+          task.guide,
+          task.useFullMarkdown
+        );
 
       await this.dbService.updateTask(taskId, {
         status: "llm_verification",
@@ -83,7 +95,8 @@ export class TaskService {
 
       const verifiedTranslations = await this.verifyTranslations(
         translations,
-        task.editorialGuidelines
+        task.editorialGuidelines,
+        contextText
       );
 
       const result: TranslationResponse = {
@@ -116,7 +129,8 @@ export class TaskService {
 
   private async verifyTranslations(
     translations: any[],
-    guidelines: EditorialGuidelines
+    guidelines: EditorialGuidelines,
+    contextText: string
   ): Promise<any[]> {
     const verifiedTranslations = [];
 
@@ -124,7 +138,8 @@ export class TaskService {
       // Call reviewAgainstGuidelines for verification
       const reviewResult = await this.reviewService.reviewAgainstGuidelines(
         translation.translatedText,
-        guidelines
+        guidelines,
+        contextText
       );
 
       const complianceScore = reviewResult.score;
@@ -157,7 +172,189 @@ export class TaskService {
 
   private async processHumanReview(
     taskId: string,
-    translations: any[]
+    translations: TranslationResult[]
+  ): Promise<void> {
+    const isDemoMode = process.env.DEMO_MODE === "true";
+
+    if (isDemoMode) {
+      await this.processDemoHumanReview(taskId, translations);
+      return;
+    }
+
+    try {
+      const task = await this.dbService.getTask(taskId);
+      if (!task) {
+        throw new Error(`Task ${taskId} not found`);
+      }
+
+      const config = await HumanReviewConfigService.getConfig();
+
+      // Ensure workspace exists (create if needed)
+      const workspaceName = HumanReviewConfigService.generateWorkspaceName();
+      const workspace = await this.prolificService.ensureWorkspaceExists(
+        workspaceName
+      );
+
+      // Update config with actual workspace ID
+      HumanReviewConfigService.setWorkspaceId(workspace.id);
+      config.workspaceId = workspace.id;
+
+      // Create a project for this specific task
+      const projectTitle = `Translation Task ${taskId}`;
+      const project = await this.prolificService.ensureProjectExists(
+        workspace.id,
+        projectTitle
+      );
+      const humanReviewBatches: HumanReviewBatch[] = [];
+      const updatedTranslations: TranslationResult[] = [];
+
+      for (const translation of translations) {
+        if (translation.status === "human_review") {
+          console.log(
+            `Creating Prolific batch for translation: ${translation.language}`
+          );
+
+          const csvData = CsvGeneratorService.generateHumanReviewCsv(
+            taskId,
+            task.mediaArticle,
+            task.editorialGuidelines,
+            translation
+          );
+
+          const batchName = CsvGeneratorService.generateBatchName(
+            taskId,
+            translation.language
+          );
+          const datasetName = CsvGeneratorService.generateDatasetName(
+            taskId,
+            translation.language
+          );
+
+          const batch = await this.prolificService.createDataCollection(
+            csvData,
+            config.workspaceId,
+            batchName,
+            datasetName,
+            {
+              task_name: config.taskDetails.taskName,
+              task_introduction: config.taskDetails.taskIntroduction,
+              task_steps: config.taskDetails.taskSteps,
+            }
+          );
+
+          const instructionsData: CreateBatchInstructionsRequest = {
+            instructions: [
+              {
+                type: "free_text",
+                description:
+                  "Please review the translation and provide feedback on its quality and compliance with the editorial guidelines.",
+              },
+              {
+                type: "multiple_choice",
+                description: "Rate the overall translation quality:",
+                options: [
+                  { label: "Excellent", value: "excellent" },
+                  { label: "Good", value: "good" },
+                  { label: "Fair", value: "fair" },
+                  { label: "Poor", value: "poor" },
+                ],
+                answer_limit: 1,
+              },
+            ],
+          };
+
+          await this.prolificService.createBatchInstructions(
+            batch.id,
+            instructionsData
+          );
+
+          console.log(`Creating study in workspace: ${config.workspaceId}`);
+
+          const studyData: CreateStudyRequest = {
+            internal_name: `human-review-${taskId}-${translation.language}`,
+            name: `Translation Review: ${translation.language}`,
+            description:
+              "Review translation quality and compliance with editorial guidelines",
+            external_study_url: `${
+              process.env.PROLIFIC_STUDY_URL || "https://app.prolific.com"
+            }/batch/${batch.id}`,
+            total_available_places: 1,
+            reward: 50,
+            device_compatibility: ["desktop", "mobile", "tablet"],
+            estimated_completion_time: 10,
+            maximum_allowed_time: 30,
+            study_type: "SINGLE",
+            publish_at: null,
+            completion_codes: [
+              {
+                code: "REVIEW_COMPLETE",
+                code_type: "COMPLETED",
+                actions: [{ action: "MANUALLY_REVIEW" }],
+              },
+            ],
+            project: project.id,
+          };
+
+          console.log(
+            "Study data being sent:",
+            JSON.stringify(studyData, null, 2)
+          );
+
+          const study = await this.prolificService.createStudy(studyData);
+
+          humanReviewBatches.push({
+            language: translation.language,
+            batchId: batch.id,
+            studyId: study.id,
+            datasetId: batch.dataset_id,
+            projectId: project.id,
+            createdAt: new Date().toISOString(),
+          });
+
+          updatedTranslations.push({
+            ...translation,
+            batchId: batch.id,
+            studyId: study.id,
+            reviewNotes: [
+              ...(translation.reviewNotes || []),
+              "Submitted for human review via Prolific",
+            ],
+          });
+
+          console.log(
+            `Created batch ${batch.id} and study ${study.id} for ${translation.language}`
+          );
+        } else {
+          updatedTranslations.push(translation);
+        }
+      }
+
+      await this.dbService.updateTask(taskId, {
+        humanReviewBatches,
+        result: {
+          ...task.result,
+          translations: updatedTranslations,
+        },
+      });
+
+      console.log(
+        `Human review setup complete for task ${taskId}. Created ${humanReviewBatches.length} batches.`
+      );
+    } catch (error) {
+      console.error(`Error setting up human review for task ${taskId}:`, error);
+
+      await this.dbService.updateTask(taskId, {
+        status: "failed",
+        error: `Human review setup failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      });
+    }
+  }
+
+  private async processDemoHumanReview(
+    taskId: string,
+    translations: TranslationResult[]
   ): Promise<void> {
     const updatedTranslations = translations.map((translation) => {
       if (translation.status === "human_review") {
@@ -167,7 +364,9 @@ export class TaskService {
           status: approved ? "done" : "failed",
           reviewNotes: [
             ...(translation.reviewNotes || []),
-            approved ? "Human review approved" : "Human review rejected",
+            approved
+              ? "Human review approved (demo)"
+              : "Human review rejected (demo)",
           ],
         };
       }
@@ -205,6 +404,14 @@ export class TaskService {
     status: TranslationTask["status"]
   ): Promise<TranslationTask[]> {
     return this.dbService.getTasksByStatus(status);
+  }
+  
+  async getTasksByBatchId(batchId: string): Promise<TranslationTask[]> {
+    return this.dbService.getTasksByBatchId(batchId);
+  }
+
+  async getTasksByStudyId(studyId: string): Promise<TranslationTask[]> {
+    return this.dbService.getTasksByStudyId(studyId);
   }
 
   async processTranslationStep(taskId: string): Promise<void> {
@@ -311,5 +518,61 @@ export class TaskService {
     await this.sleep(2000);
 
     await this.processHumanReview(taskId, task.result.translations);
+  }
+  
+  async updateHumanReviewStatus(
+    taskId: string,
+    language: string,
+    newStatus: "done" | "failed",
+    reviewNotes?: string[]
+  ): Promise<void> {
+    const task = await this.dbService.getTask(taskId);
+    if (!task?.result?.translations) {
+      throw new Error(`Task ${taskId} or translations not found`);
+    }
+
+    const updatedTranslations = task.result.translations.map(
+      (translation: TranslationResult) => {
+        if (translation.language === language) {
+          return {
+            ...translation,
+            status: newStatus,
+            reviewNotes: reviewNotes || [
+              ...(translation.reviewNotes || []),
+              `Human review ${newStatus}`,
+            ],
+          };
+        }
+        return translation;
+      }
+    );
+
+    const finalStatus = this.determineOverallTaskStatus(updatedTranslations);
+    const progress = finalStatus === "done" ? 100 : task.progress;
+
+    await this.dbService.updateTask(taskId, {
+      status: finalStatus,
+      progress,
+      result: {
+        ...task.result,
+        translations: updatedTranslations,
+      },
+    });
+  }
+
+  async deleteAllTasks(): Promise<number> {
+    const allTasks = await this.dbService.getAllTasks();
+    let deletedCount = 0;
+
+    for (const task of allTasks) {
+      try {
+        await this.dbService.deleteTask(task.id);
+        deletedCount++;
+      } catch (error) {
+        console.error(`Error deleting task ${task.id}:`, error);
+      }
+    }
+
+    return deletedCount;
   }
 }

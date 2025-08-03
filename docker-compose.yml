@@ -1,13 +1,48 @@
-version: '3.8'
+version: "3.8"
 
 services:
+  # Local Redis for development
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack-server:6.2.6-v6 # 6.2 is Upstash compatible version
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
+
+  # Serverless Redis HTTP (SRH) - provides Upstash-compatible REST API for local Redis
+  # This allows us to use the same @upstash/redis SDK for both local and production
+  redis-proxy:
+    image: hiett/serverless-redis-http:latest
+    ports:
+      - "8080:80"
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: local_dev_token
+      SRH_CONNECTION_STRING: "redis://redis:6379"
+    depends_on:
+      - redis
+
+  # Development app service
+  app:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      # Local development Redis via SRH proxy
+      - UPSTASH_REDIS_REST_URL=http://redis-proxy:80
+      - UPSTASH_REDIS_REST_TOKEN=local_dev_token
+      # Alternative env var names (for compatibility)
+      - KV_REST_API_URL=http://redis-proxy:80
+      - KV_REST_API_TOKEN=local_dev_token
+    depends_on:
+      - redis-proxy
+    command: npm run dev
 
 volumes:
   redis_data:

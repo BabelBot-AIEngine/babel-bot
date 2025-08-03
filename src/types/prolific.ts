@@ -28,12 +28,12 @@ export interface CreateStudyRequest {
   publish_at: string | null;
   submissions_config?: SubmissionsConfig;
   workspace_id?: string;
+  project?: string;
   prolific_id_option?: "required" | "not_required" | "question";
   peripheral_requirements?: string[];
   selected_location?: string[];
   completion_option?: "code" | "url";
   quota_requirements?: any[];
-  project?: string;
   filter_set_id?: string;
 }
 
@@ -148,4 +148,57 @@ export interface BatchInstructions {
   instructions: Instruction[];
   created_at: string;
   updated_at: string;
+}
+
+export interface CreateWorkspaceRequest {
+  title: string;
+}
+
+export interface WorkspaceUser {
+  id: string;
+  name: string;
+  email: string;
+  roles: string[];
+}
+
+export interface Workspace {
+  id: string;
+  title: string;
+  description?: string;
+  owner: string;
+  users: WorkspaceUser[];
+  naivety_distribution_rate: number;
+  product: string;
+  is_trial_workspace: boolean;
+  cloud_marketplace_account: any;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateProjectRequest {
+  title: string;
+}
+
+export interface ProjectUser {
+  id: string;
+  name: string;
+  email: string;
+  roles: string[];
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  owner: string;
+  users: ProjectUser[];
+  naivety_distribution_rate: number | null;
+  position: number;
+  hidden: boolean | null;
+  _links?: {
+    self: {
+      title: string;
+      href: string;
+    };
+  };
 }

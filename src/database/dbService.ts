@@ -1,5 +1,5 @@
-import { createClient, RedisClientType } from "redis";
-import { GuideType } from "../types";
+import { Redis } from "@upstash/redis";
+import { GuideType, HumanReviewBatch } from "../types";
 
 export interface TranslationTask {
   id: string;
@@ -23,50 +23,26 @@ export interface TranslationTask {
   updatedAt: string;
   progress?: number;
   guide?: GuideType;
+  humanReviewBatches?: HumanReviewBatch[];
   useFullMarkdown?: boolean;
 }
 
 export class DatabaseService {
-  private client: RedisClientType;
-  private isConnected: boolean = false;
+  private redis: Redis;
 
   constructor() {
-    this.client = createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379'
+    this.redis = new Redis({
+      url: process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL!,
+      token:
+        process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN!,
     });
-    this.initializeConnection();
-  }
-
-  private async initializeConnection(): Promise<void> {
-    try {
-      this.client.on('error', (err) => {
-        console.error('Redis client error:', err);
-        this.isConnected = false;
-      });
-
-      this.client.on('connect', () => {
-        console.log('Connected to Redis');
-        this.isConnected = true;
-      });
-
-      await this.client.connect();
-      console.log('Redis connection initialized successfully');
-    } catch (error) {
-      console.error('Error connecting to Redis:', error);
-      throw error;
-    }
+    console.log("DatabaseService initialized with Upstash Redis");
   }
 
   async createTask(
     task: Omit<TranslationTask, "id" | "createdAt" | "updatedAt">
   ): Promise<string> {
-    if (!this.isConnected) {
-      await this.initializeConnection();
-    }
-
-    const id = `task_${Date.now()}_${Math.random()
-      .toString(36)
-      .substr(2, 9)}`;
+    const id = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const now = new Date().toISOString();
     const createdAtTimestamp = Date.now();
 
@@ -76,20 +52,25 @@ export class DatabaseService {
       mediaArticle: JSON.stringify(task.mediaArticle),
       editorialGuidelines: JSON.stringify(task.editorialGuidelines),
       destinationLanguages: JSON.stringify(task.destinationLanguages),
-      result: task.result ? JSON.stringify(task.result) : '',
-      error: task.error || '',
+      result: task.result ? JSON.stringify(task.result) : "",
+      error: task.error || "",
       createdAt: now,
       updatedAt: now,
       progress: (task.progress || 0).toString(),
-      guide: task.guide || '',
+      guide: task.guide || "",
+      humanReviewBatches: task.humanReviewBatches
+        ? JSON.stringify(task.humanReviewBatches)
+        : "",
     };
 
-    const multi = this.client.multi();
-    multi.hSet(`task:${id}`, taskData);
-    multi.sAdd(`tasks:status:${task.status}`, id);
-    multi.zAdd('tasks:created', { score: createdAtTimestamp, value: id });
-    
-    await multi.exec();
+    // Upstash Redis operations
+    await this.redis.hset(`task:${id}`, taskData);
+    await this.redis.sadd(`tasks:status:${task.status}`, id);
+    await this.redis.zadd("tasks:created", {
+      score: createdAtTimestamp,
+      member: id,
+    });
+
     return id;
   }
 
@@ -97,27 +78,25 @@ export class DatabaseService {
     id: string,
     updates: Partial<TranslationTask>
   ): Promise<void> {
-    if (!this.isConnected) {
-      await this.initializeConnection();
-    }
-
-    const taskExists = await this.client.exists(`task:${id}`);
+    const taskExists = await this.redis.exists(`task:${id}`);
     if (!taskExists) {
       throw new Error(`Task ${id} not found`);
     }
 
     const now = new Date().toISOString();
-    const updateData: Record<string, string> = {
+    const updateData: Record<string, any> = {
       updatedAt: now,
     };
 
-    const currentTask = await this.client.hGetAll(`task:${id}`);
-    const multi = this.client.multi();
+    const currentTask = (await this.redis.hgetall(`task:${id}`)) as Record<
+      string,
+      string
+    >;
 
     if (updates.status && updates.status !== currentTask.status) {
       updateData.status = updates.status;
-      multi.sRem(`tasks:status:${currentTask.status}`, id);
-      multi.sAdd(`tasks:status:${updates.status}`, id);
+      await this.redis.srem(`tasks:status:${currentTask.status}`, id);
+      await this.redis.sadd(`tasks:status:${updates.status}`, id);
     }
     if (updates.result !== undefined) {
       updateData.result = JSON.stringify(updates.result);
@@ -128,18 +107,21 @@ export class DatabaseService {
     if (updates.progress !== undefined) {
       updateData.progress = updates.progress.toString();
     }
+    if (updates.humanReviewBatches !== undefined) {
+      updateData.humanReviewBatches = JSON.stringify(
+        updates.humanReviewBatches
+      );
+    }
 
-    multi.hSet(`task:${id}`, updateData);
-    await multi.exec();
+    await this.redis.hset(`task:${id}`, updateData);
   }
 
   async getTask(id: string): Promise<TranslationTask | null> {
-    if (!this.isConnected) {
-      await this.initializeConnection();
-    }
+    const taskData = (await this.redis.hgetall(`task:${id}`)) as Record<
+      string,
+      string
+    >;
 
-    const taskData = await this.client.hGetAll(`task:${id}`);
-    
     if (!taskData || Object.keys(taskData).length === 0) {
       return null;
     }
@@ -148,20 +130,23 @@ export class DatabaseService {
   }
 
   async getAllTasks(): Promise<TranslationTask[]> {
-    if (!this.isConnected) {
-      await this.initializeConnection();
-    }
-
-    const taskIds = await this.client.zRange('tasks:created', 0, -1);
+    const taskIds = (await this.redis.zrange(
+      "tasks:created",
+      0,
+      -1
+    )) as string[];
     const sortedTaskIds = taskIds.reverse();
-    
+
     if (sortedTaskIds.length === 0) {
       return [];
     }
 
     const tasks: TranslationTask[] = [];
     for (const taskId of sortedTaskIds) {
-      const taskData = await this.client.hGetAll(`task:${taskId}`);
+      const taskData = (await this.redis.hgetall(`task:${taskId}`)) as Record<
+        string,
+        string
+      >;
       if (taskData && Object.keys(taskData).length > 0) {
         tasks.push(this.mapRedisDataToTask(taskData));
       }
@@ -173,48 +158,85 @@ export class DatabaseService {
   async getTasksByStatus(
     status: TranslationTask["status"]
   ): Promise<TranslationTask[]> {
-    if (!this.isConnected) {
-      await this.initializeConnection();
-    }
+    const taskIds = (await this.redis.smembers(
+      `tasks:status:${status}`
+    )) as string[];
 
-    const taskIds = await this.client.sMembers(`tasks:status:${status}`);
-    
     if (taskIds.length === 0) {
       return [];
     }
 
     const tasks: TranslationTask[] = [];
     for (const taskId of taskIds) {
-      const taskData = await this.client.hGetAll(`task:${taskId}`);
+      const taskData = (await this.redis.hgetall(`task:${taskId}`)) as Record<
+        string,
+        string
+      >;
       if (taskData && Object.keys(taskData).length > 0) {
         tasks.push(this.mapRedisDataToTask(taskData));
       }
     }
 
-    tasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    tasks.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
     return tasks;
   }
 
-  private mapRedisDataToTask(data: Record<string, string>): TranslationTask {
+  private mapRedisDataToTask(data: Record<string, any>): TranslationTask {
+    // Upstash Redis properly deserializes JSON objects, no special handling needed
+
     return {
       id: data.id,
-      status: data.status as TranslationTask['status'],
-      mediaArticle: JSON.parse(data.mediaArticle),
-      editorialGuidelines: JSON.parse(data.editorialGuidelines),
-      destinationLanguages: JSON.parse(data.destinationLanguages),
-      result: data.result ? JSON.parse(data.result) : undefined,
+      status: data.status as TranslationTask["status"],
+      mediaArticle: data.mediaArticle || { text: "", title: "", metadata: {} },
+      editorialGuidelines: data.editorialGuidelines || {},
+      destinationLanguages: data.destinationLanguages || [],
+      result: data.result || undefined,
       error: data.error || undefined,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
       progress: parseInt(data.progress) || 0,
-      guide: (data.guide && data.guide !== '') ? data.guide as GuideType : undefined,
+      guide:
+        data.guide && data.guide !== "" ? (data.guide as GuideType) : undefined,
+      humanReviewBatches: data.humanReviewBatches || undefined,
     };
   }
 
-  async close(): Promise<void> {
-    if (this.isConnected) {
-      await this.client.disconnect();
-      this.isConnected = false;
+  async getTasksByBatchId(batchId: string): Promise<TranslationTask[]> {
+    const allTasks = await this.getAllTasks();
+    return allTasks.filter((task) =>
+      task.humanReviewBatches?.some((batch) => batch.batchId === batchId)
+    );
+  }
+
+  async getTasksByStudyId(studyId: string): Promise<TranslationTask[]> {
+    const allTasks = await this.getAllTasks();
+    return allTasks.filter((task) =>
+      task.humanReviewBatches?.some((batch) => batch.studyId === studyId)
+    );
+  }
+
+  async deleteTask(id: string): Promise<void> {
+    const taskData = (await this.redis.hgetall(`task:${id}`)) as Record<
+      string,
+      string
+    >;
+    if (!taskData || Object.keys(taskData).length === 0) {
+      throw new Error(`Task ${id} not found`);
     }
+
+    // Upstash Redis operations (no transactions, but operations are atomic)
+    await this.redis.del(`task:${id}`);
+    await this.redis.srem(`tasks:status:${taskData.status}`, id);
+    await this.redis.zrem("tasks:created", id);
+  }
+
+  async close(): Promise<void> {
+    // Upstash Redis doesn't require explicit connection closing
+    console.log(
+      "DatabaseService closed (Upstash Redis handles connections automatically)"
+    );
   }
 }

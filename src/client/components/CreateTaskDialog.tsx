@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
@@ -15,9 +14,13 @@ import {
   Typography,
   SelectChangeEvent,
   CircularProgress,
-} from '@mui/material';
-import { Add as AddIcon } from '@mui/icons-material';
-import { fetchAvailableLanguages, getLanguageDisplayName } from '../../utils/languageUtils';
+} from "@mui/material";
+import { Add as AddIcon } from "@mui/icons-material";
+import { useAuth } from "@clerk/clerk-react";
+import {
+  fetchAvailableLanguages,
+  getLanguageDisplayName,
+} from "../../utils/languageUtils";
 
 interface CreateTaskDialogProps {
   open: boolean;
@@ -34,13 +37,16 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [title, setTitle] = useState('');
-  const [text, setText] = useState('');
-  const [tone, setTone] = useState('');
-  const [style, setStyle] = useState('');
-  const [targetAudience, setTargetAudience] = useState('');
+  const { getToken } = useAuth();
+  const [title, setTitle] = useState("");
+  const [text, setText] = useState("");
+  const [tone, setTone] = useState("");
+  const [style, setStyle] = useState("");
+  const [targetAudience, setTargetAudience] = useState("");
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
-  const [availableLanguages, setAvailableLanguages] = useState<Array<{ code: string; name: string }>>([]);
+  const [availableLanguages, setAvailableLanguages] = useState<
+    Array<{ code: string; name: string }>
+  >([]);
   const [languagesLoading, setLanguagesLoading] = useState(false);
   const [languagesError, setLanguagesError] = useState<string | null>(null);
 
@@ -50,11 +56,14 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
         setLanguagesLoading(true);
         setLanguagesError(null);
         try {
-          const languages = await fetchAvailableLanguages();
+          const token = await getToken();
+          const languages = await fetchAvailableLanguages(token || undefined);
           setAvailableLanguages(languages);
         } catch (error) {
-          console.error('Failed to load languages:', error);
-          setLanguagesError(error instanceof Error ? error.message : 'Failed to load languages');
+          console.error("Failed to load languages:", error);
+          setLanguagesError(
+            error instanceof Error ? error.message : "Failed to load languages"
+          );
         } finally {
           setLanguagesLoading(false);
         }
@@ -62,7 +71,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     };
 
     loadLanguages();
-  }, [open, availableLanguages.length, languagesLoading]);
+  }, [open, availableLanguages.length, languagesLoading, getToken]);
 
   const handleLanguageChange = (event: SelectChangeEvent<string[]>) => {
     setSelectedLanguages(event.target.value as string[]);
@@ -73,11 +82,14 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     setLanguagesError(null);
     setLanguagesLoading(true);
     try {
-      const languages = await fetchAvailableLanguages();
+      const token = await getToken();
+      const languages = await fetchAvailableLanguages(token || undefined);
       setAvailableLanguages(languages);
     } catch (error) {
-      console.error('Failed to load languages:', error);
-      setLanguagesError(error instanceof Error ? error.message : 'Failed to load languages');
+      console.error("Failed to load languages:", error);
+      setLanguagesError(
+        error instanceof Error ? error.message : "Failed to load languages"
+      );
     } finally {
       setLanguagesLoading(false);
     }
@@ -102,59 +114,59 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     });
 
     // Reset form
-    setTitle('');
-    setText('');
-    setTone('');
-    setStyle('');
-    setTargetAudience('');
+    setTitle("");
+    setText("");
+    setTone("");
+    setStyle("");
+    setTargetAudience("");
     setSelectedLanguages([]);
   };
 
   const handleClose = () => {
-    setTitle('');
-    setText('');
-    setTone('');
-    setStyle('');
-    setTargetAudience('');
+    setTitle("");
+    setText("");
+    setTone("");
+    setStyle("");
+    setTargetAudience("");
     setSelectedLanguages([]);
     onClose();
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={handleClose} 
-      maxWidth="md" 
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
       fullWidth
       PaperProps={{
         sx: {
           borderRadius: 3,
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-        }
+          background: "rgba(255, 255, 255, 0.95)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(255, 255, 255, 0.2)",
+        },
       }}
       BackdropProps={{
         sx: {
-          backgroundColor: 'rgba(0, 0, 0, 0.4)',
-          backdropFilter: 'blur(4px)',
-        }
+          backgroundColor: "rgba(0, 0, 0, 0.4)",
+          backdropFilter: "blur(4px)",
+        },
       }}
     >
       <Box
         sx={{
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-          color: 'white',
+          background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+          color: "white",
           p: 3,
-          borderRadius: '12px 12px 0 0',
+          borderRadius: "12px 12px 0 0",
         }}
       >
-        <Typography 
-          variant="h5" 
-          sx={{ 
+        <Typography
+          variant="h5"
+          sx={{
             fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
+            display: "flex",
+            alignItems: "center",
           }}
         >
           <AddIcon sx={{ mr: 2, fontSize: 28 }} />
@@ -164,9 +176,9 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
           Transform your content across languages with AI-powered precision
         </Typography>
       </Box>
-      
+
       <DialogContent sx={{ p: 4 }}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
           <TextField
             label="Article Title"
             value={title}
@@ -175,14 +187,14 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
             variant="outlined"
             placeholder="Enter an optional title for your article"
             sx={{
-              '& .MuiOutlinedInput-root': {
+              "& .MuiOutlinedInput-root": {
                 borderRadius: 2,
-                background: 'rgba(255, 255, 255, 0.8)',
-                '&:hover': {
-                  background: 'rgba(255, 255, 255, 0.9)',
+                background: "rgba(255, 255, 255, 0.8)",
+                "&:hover": {
+                  background: "rgba(255, 255, 255, 0.9)",
                 },
-                '&.Mui-focused': {
-                  background: 'rgba(255, 255, 255, 1)',
+                "&.Mui-focused": {
+                  background: "rgba(255, 255, 255, 1)",
                 },
               },
             }}
@@ -198,17 +210,21 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
             variant="outlined"
             required
             error={!text.trim()}
-            helperText={!text.trim() ? 'Article content is required' : `${text.length} characters`}
+            helperText={
+              !text.trim()
+                ? "Article content is required"
+                : `${text.length} characters`
+            }
             placeholder="Paste or type your article content here..."
             sx={{
-              '& .MuiOutlinedInput-root': {
+              "& .MuiOutlinedInput-root": {
                 borderRadius: 2,
-                background: 'rgba(255, 255, 255, 0.8)',
-                '&:hover': {
-                  background: 'rgba(255, 255, 255, 0.9)',
+                background: "rgba(255, 255, 255, 0.8)",
+                "&:hover": {
+                  background: "rgba(255, 255, 255, 0.9)",
                 },
-                '&.Mui-focused': {
-                  background: 'rgba(255, 255, 255, 1)',
+                "&.Mui-focused": {
+                  background: "rgba(255, 255, 255, 1)",
                 },
               },
             }}
@@ -217,19 +233,22 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
           <Box
             sx={{
               p: 3,
-              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-              border: '1px solid #e2e8f0',
+              background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+              border: "1px solid #e2e8f0",
               borderRadius: 2,
             }}
           >
-            <Typography variant="h6" sx={{ mb: 2, color: '#1e293b', fontWeight: 600 }}>
+            <Typography
+              variant="h6"
+              sx={{ mb: 2, color: "#1e293b", fontWeight: 600 }}
+            >
               Editorial Guidelines
             </Typography>
-            <Typography variant="body2" sx={{ mb: 3, color: '#64748b' }}>
+            <Typography variant="body2" sx={{ mb: 3, color: "#64748b" }}>
               Define the tone and style to ensure consistent translations
             </Typography>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
               <TextField
                 label="Tone"
                 value={tone}
@@ -238,9 +257,9 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                 variant="outlined"
                 placeholder="Professional, Casual, Formal, Friendly..."
                 sx={{
-                  '& .MuiOutlinedInput-root': {
+                  "& .MuiOutlinedInput-root": {
                     borderRadius: 2,
-                    background: 'white',
+                    background: "white",
                   },
                 }}
               />
@@ -253,9 +272,9 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                 variant="outlined"
                 placeholder="Journalistic, Academic, Marketing, Technical..."
                 sx={{
-                  '& .MuiOutlinedInput-root': {
+                  "& .MuiOutlinedInput-root": {
                     borderRadius: 2,
-                    background: 'white',
+                    background: "white",
                   },
                 }}
               />
@@ -268,28 +287,28 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                 variant="outlined"
                 placeholder="General public, Technical experts, Students..."
                 sx={{
-                  '& .MuiOutlinedInput-root': {
+                  "& .MuiOutlinedInput-root": {
                     borderRadius: 2,
-                    background: 'white',
+                    background: "white",
                   },
                 }}
               />
             </Box>
           </Box>
 
-          <FormControl 
-            fullWidth 
-            required 
+          <FormControl
+            fullWidth
+            required
             error={selectedLanguages.length === 0}
             sx={{
-              '& .MuiOutlinedInput-root': {
+              "& .MuiOutlinedInput-root": {
                 borderRadius: 2,
-                background: 'rgba(255, 255, 255, 0.8)',
-                '&:hover': {
-                  background: 'rgba(255, 255, 255, 0.9)',
+                background: "rgba(255, 255, 255, 0.8)",
+                "&:hover": {
+                  background: "rgba(255, 255, 255, 0.9)",
                 },
-                '&.Mui-focused': {
-                  background: 'rgba(255, 255, 255, 1)',
+                "&.Mui-focused": {
+                  background: "rgba(255, 255, 255, 1)",
                 },
               },
             }}
@@ -301,15 +320,16 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               onChange={handleLanguageChange}
               disabled={languagesLoading || !!languagesError}
               renderValue={(selected) => (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                   {selected.map((value) => (
-                    <Chip 
-                      key={value} 
-                      label={getLanguageDisplayName(value)} 
+                    <Chip
+                      key={value}
+                      label={getLanguageDisplayName(value)}
                       size="small"
                       sx={{
-                        background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
-                        color: 'white',
+                        background:
+                          "linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)",
+                        color: "white",
                         fontWeight: 600,
                       }}
                     />
@@ -319,14 +339,23 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
             >
               {languagesLoading ? (
                 <MenuItem disabled>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <CircularProgress size={16} />
-                    <Typography variant="body2">Loading languages from DeepL...</Typography>
+                    <Typography variant="body2">
+                      Loading languages from DeepL...
+                    </Typography>
                   </Box>
                 </MenuItem>
               ) : languagesError ? (
                 <MenuItem disabled>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, py: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1,
+                      py: 1,
+                    }}
+                  >
                     <Typography variant="body2" color="error">
                       Failed to load languages
                     </Typography>
@@ -358,7 +387,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
               )}
             </Select>
             {selectedLanguages.length === 0 && (
-              <Typography variant="caption" sx={{ color: '#ef4444', mt: 1 }}>
+              <Typography variant="caption" sx={{ color: "#ef4444", mt: 1 }}>
                 Please select at least one destination language
               </Typography>
             )}
@@ -367,15 +396,15 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
       </DialogContent>
 
       <DialogActions sx={{ p: 4, pt: 0 }}>
-        <Button 
+        <Button
           onClick={handleClose}
           sx={{
             borderRadius: 2,
             px: 3,
             py: 1,
-            color: '#64748b',
-            '&:hover': {
-              background: 'rgba(100, 116, 139, 0.04)',
+            color: "#64748b",
+            "&:hover": {
+              background: "rgba(100, 116, 139, 0.04)",
             },
           }}
         >
@@ -385,25 +414,31 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
           onClick={handleSubmit}
           variant="contained"
           startIcon={<AddIcon />}
-          disabled={!text.trim() || selectedLanguages.length === 0 || languagesLoading || !!languagesError || availableLanguages.length === 0}
+          disabled={
+            !text.trim() ||
+            selectedLanguages.length === 0 ||
+            languagesLoading ||
+            !!languagesError ||
+            availableLanguages.length === 0
+          }
           sx={{
-            background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
+            background: "linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)",
             borderRadius: 2,
             px: 4,
             py: 1,
             fontWeight: 600,
-            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.4)',
-            '&:hover': {
-              background: 'linear-gradient(45deg, #4f46e5 30%, #7c3aed 90%)',
-              transform: 'translateY(-1px)',
-              boxShadow: '0 6px 16px rgba(99, 102, 241, 0.5)',
+            boxShadow: "0 4px 12px rgba(99, 102, 241, 0.4)",
+            "&:hover": {
+              background: "linear-gradient(45deg, #4f46e5 30%, #7c3aed 90%)",
+              transform: "translateY(-1px)",
+              boxShadow: "0 6px 16px rgba(99, 102, 241, 0.5)",
             },
-            '&:disabled': {
-              background: 'rgba(148, 163, 184, 0.3)',
-              color: 'rgba(148, 163, 184, 0.7)',
-              boxShadow: 'none',
+            "&:disabled": {
+              background: "rgba(148, 163, 184, 0.3)",
+              color: "rgba(148, 163, 184, 0.7)",
+              boxShadow: "none",
             },
-            transition: 'all 0.2s ease',
+            transition: "all 0.2s ease",
           }}
         >
           Create Task
