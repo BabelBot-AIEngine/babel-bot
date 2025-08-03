@@ -146,9 +146,11 @@ Select the most appropriate classification based on the translation's quality an
     destinationLanguages: string[],
     guide?: GuideType,
     useFullMarkdown?: boolean
-  ): Promise<TranslationResult[]> {
+  ): Promise<[TranslationResult[], string]> {
     const results: TranslationResult[] = [];
     this.setup();
+    console.log("guide", guide);
+    console.log("useFullMarkdown", useFullMarkdown);
 
     const { effectiveGuidelines, contextText } =
       await this.loadGuidelinesByType(
@@ -156,6 +158,8 @@ Select the most appropriate classification based on the translation's quality an
         guidelines,
         useFullMarkdown
       );
+    console.log("contextText", contextText);
+    console.log("effectiveGuidelines", effectiveGuidelines);
 
     for (const language of destinationLanguages) {
       const translatedText = await this.performTranslation(
@@ -195,7 +199,7 @@ Select the most appropriate classification based on the translation's quality an
       });
     }
 
-    return results;
+    return [results, contextText];
   }
 
   private async loadGuidelinesByType(
@@ -472,6 +476,7 @@ Select the most appropriate classification based on the translation's quality an
         context: context || undefined,
       };
 
+      console.log("translateOptions", translateOptions);
       const result = await this.translator?.translateText(
         text,
         null,
