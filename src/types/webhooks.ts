@@ -24,7 +24,7 @@ export interface ProlificWebhookPayload {
 export interface BabelWebhookPayload {
   event: string;
   taskId: string;
-  timestamp: number;
+  timestamp: number; // POSIX timestamp in seconds (not milliseconds)
   data: any;
   _retryCount?: number;
   _originalAttemptTime?: number;

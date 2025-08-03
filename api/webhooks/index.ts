@@ -63,7 +63,8 @@ async function handleProlificWebhook(
   headers: Record<string, string>,
   body: any
 ): Promise<void> {
-  const signature = headers['x-prolific-signature'];
+  const signature = headers['x-prolific-request-signature'];
+  const timestamp = headers['x-prolific-request-timestamp'];
   const secret = process.env.PROLIFIC_WEBHOOK_SECRET;
 
   if (!secret) {
@@ -74,11 +75,14 @@ async function handleProlificWebhook(
     });
   }
 
-  if (!signature) {
-    console.error('Missing X-Prolific-Signature header');
+  if (!signature || !timestamp) {
+    console.error('Missing required Prolific webhook headers:', {
+      hasSignature: !!signature,
+      hasTimestamp: !!timestamp
+    });
     return res.status(401).json({ 
       error: 'Unauthorized',
-      message: 'Missing signature header'
+      message: 'Missing required headers'
     });
   }
 
@@ -87,6 +91,7 @@ async function handleProlificWebhook(
   const verification = WebhookVerificationService.verifyProlificWebhook(
     rawBody,
     signature,
+    timestamp,
     secret
   );
 

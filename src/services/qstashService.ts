@@ -22,7 +22,7 @@ export class QStashService {
     secret: string
   ): Promise<void> {
     const client = this.getClient();
-    const timestamp = Date.now();
+    const timestamp = Math.floor(Date.now() / 1000); // POSIX timestamp in seconds
     
     // Create QStash-specific payload with signature
     const qstashPayload: QStashWebhookPayload = {
@@ -81,7 +81,7 @@ export class QStashService {
     delaySeconds: number
   ): Promise<void> {
     const client = this.getClient();
-    const timestamp = Date.now();
+    const timestamp = Math.floor(Date.now() / 1000); // POSIX timestamp in seconds
     
     const qstashPayload: QStashWebhookPayload = {
       ...payload,

@@ -18,7 +18,7 @@ export class WebhookSender {
     const finalOptions = { ...this.DEFAULT_OPTIONS, ...options };
     const timestampedPayload: BabelWebhookPayload = {
       ...payload,
-      timestamp: Date.now()
+      timestamp: Math.floor(Date.now() / 1000) // POSIX timestamp in seconds
     };
 
     console.log(`Attempting to send webhook to ${url}:`, {
