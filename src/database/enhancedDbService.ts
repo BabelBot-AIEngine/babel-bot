@@ -77,7 +77,7 @@ export class EnhancedDatabaseService {
       destinationLanguages: JSON.stringify(enhancedTask.destinationLanguages),
       createdAt: now,
       updatedAt: now,
-      progress: enhancedTask.progress.toString(),
+      progress: (enhancedTask.progress || 0).toString(),
       guide: enhancedTask.guide || "",
       useFullMarkdown: enhancedTask.useFullMarkdown ? "true" : "false",
       maxReviewIterations: enhancedTask.maxReviewIterations.toString(),

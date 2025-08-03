@@ -165,7 +165,7 @@ export class EnhancedTaskService {
         task.mediaArticle,
         task.editorialGuidelines,
         [payload.data.language], // Single language
-        task.guide,
+        task.guide as GuideType,
         task.useFullMarkdown
       );
 

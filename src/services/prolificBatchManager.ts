@@ -4,6 +4,7 @@ import { HumanReviewConfigService } from "./humanReviewConfig";
 import { CsvGeneratorService } from "./csvGenerator";
 import { StudyEstimationService } from "./studyEstimationService";
 import { WebhookSender } from "./webhookSender";
+import { TranslationResult, LanguageTaskStatus } from "../types";
 import {
   LanguageSubTaskStatus,
   ReviewBatchCreatedEvent,
@@ -225,21 +226,21 @@ export class ProlificBatchManager {
     const project = await this.prolificService.ensureProjectExists(workspaceId, projectTitle);
 
     // Generate CSV data for all languages in the batch
-    const csvRows: any[] = [];
+    const csvRows: string[] = [];
     for (const language of batch.languages) {
       const subTask = task.languageSubTasks[language];
       if (subTask && subTask.translatedText) {
         // Create a translation result object for CSV generation
-        const translationResult = {
+        const translationResult: TranslationResult = {
           language,
           translatedText: subTask.translatedText,
           reviewNotes: subTask.iterations.length > 0 
-            ? subTask.iterations[subTask.iterations.length - 1].llmVerification.feedback
+            ? [subTask.iterations[subTask.iterations.length - 1].llmVerification.feedback]
             : [],
           complianceScore: subTask.iterations.length > 0
             ? subTask.iterations[subTask.iterations.length - 1].llmVerification.score * 20 // Convert back to 100-point scale
             : 0,
-          status: "human_review",
+          status: "human_review" as LanguageTaskStatus,
         };
 
         const csvData = CsvGeneratorService.generateHumanReviewCsv(
@@ -249,7 +250,7 @@ export class ProlificBatchManager {
           translationResult
         );
 
-        csvRows.push(...csvData);
+        csvRows.push(csvData);
       }
     }
 
@@ -259,7 +260,7 @@ export class ProlificBatchManager {
 
     // Create data collection
     const dataCollection = await this.prolificService.createDataCollection(
-      csvRows,
+      csvRows.join('\n'),
       workspaceId,
       batchName,
       datasetName,
