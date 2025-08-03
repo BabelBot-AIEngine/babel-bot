@@ -4,7 +4,7 @@ import { HumanReviewConfigService } from "./humanReviewConfig";
 import { CsvGeneratorService } from "./csvGenerator";
 import { StudyEstimationService } from "./studyEstimationService";
 import { WebhookSender } from "./webhookSender";
-import { TranslationResult, LanguageTaskStatus } from "../types";
+import { TranslationResult, LanguageTaskStatus, GuideType } from "../types";
 import {
   LanguageSubTaskStatus,
   ReviewBatchCreatedEvent,
@@ -55,45 +55,76 @@ export class ProlificBatchManager {
     console.log(`Found ${readySubTasks.length} language sub-tasks ready for review`);
 
     // Group by similar characteristics for batching
-    const batches = this.groupSubTasksIntoBatches(readySubTasks);
+    const batches = await this.groupSubTasksIntoBatches(readySubTasks);
 
     for (const batch of batches) {
       await this.createReviewBatch(batch);
     }
   }
 
-  private groupSubTasksIntoBatches(
+  private async groupSubTasksIntoBatches(
     subTasks: Array<{taskId: string, language: string, subTask: any}>
-  ): Array<{taskIds: string[], languages: string[], iterationNumbers: {[key: string]: number}}> {
-    // For now, we'll create one batch per unique task to maintain isolation
-    // In the future, we could batch across tasks with similar characteristics
-    const taskGroups = new Map<string, Array<{taskId: string, language: string, subTask: any}>>();
+  ): Promise<Array<{taskIds: string[], languages: string[], iterationNumbers: {[key: string]: number}}>> {
+    // Group by: Single Language + Editorial Context + Iteration Level
+    // This ensures each Prolific study is focused and consistent for reviewers
+    const batchGroups = new Map<string, Array<{taskId: string, language: string, subTask: any}>>();
     
-    for (const subTask of subTasks) {
-      if (!taskGroups.has(subTask.taskId)) {
-        taskGroups.set(subTask.taskId, []);
+    for (const subTaskInfo of subTasks) {
+      const task = await this.dbService.getEnhancedTask(subTaskInfo.taskId);
+      if (!task) continue;
+      
+      // Create a unique key ensuring single-language, same-context batching
+      const contextHash = this.createEditorialContextHash(task.editorialGuidelines, task.guide);
+      const batchKey = `${subTaskInfo.language}_${contextHash}_iter${subTaskInfo.subTask.currentIteration}`;
+      
+      if (!batchGroups.has(batchKey)) {
+        batchGroups.set(batchKey, []);
       }
-      taskGroups.get(subTask.taskId)!.push(subTask);
+      batchGroups.get(batchKey)!.push(subTaskInfo);
     }
 
     const batches: Array<{taskIds: string[], languages: string[], iterationNumbers: {[key: string]: number}}> = [];
     
-    for (const [taskId, taskSubTasks] of taskGroups) {
-      const languages = taskSubTasks.map(st => st.language);
+    for (const [batchKey, groupedSubTasks] of batchGroups) {
+      // Each batch is now: single language + same editorial context + same iteration
+      const language = groupedSubTasks[0].language;
+      const iterationLevel = groupedSubTasks[0].subTask.currentIteration;
+      
+      const taskIds = groupedSubTasks.map(st => st.taskId);
       const iterationNumbers: {[key: string]: number} = {};
       
-      for (const subTask of taskSubTasks) {
-        iterationNumbers[`${subTask.taskId}_${subTask.language}`] = subTask.subTask.currentIteration;
+      for (const subTask of groupedSubTasks) {
+        iterationNumbers[`${subTask.taskId}_${subTask.language}`] = iterationLevel;
       }
 
       batches.push({
-        taskIds: [taskId],
-        languages,
+        taskIds,
+        languages: [language], // Always single language now
         iterationNumbers,
       });
     }
 
     return batches;
+  }
+
+  private createEditorialContextHash(guidelines: any, guide?: string): string {
+    // Create a consistent hash for similar editorial contexts
+    const contextString = JSON.stringify({
+      tone: guidelines.tone || 'neutral',
+      audience: guidelines.audience || 'general',
+      style: guidelines.style || 'standard',
+      guide: guide || 'general'
+    });
+    
+    // Simple hash function for grouping similar contexts
+    let hash = 0;
+    for (let i = 0; i < contextString.length; i++) {
+      const char = contextString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    
+    return `context_${Math.abs(hash)}`;
   }
 
   private async createReviewBatch(
@@ -225,14 +256,20 @@ export class ProlificBatchManager {
     const projectTitle = `Translation Review Batch ${batch.batchId}`;
     const project = await this.prolificService.ensureProjectExists(workspaceId, projectTitle);
 
-    // Generate CSV data for all languages in the batch
+    // Generate CSV data for the single language in this batch
     const csvRows: string[] = [];
-    for (const language of batch.languages) {
-      const subTask = task.languageSubTasks[language];
+    const batchLanguage = batch.languages[0]; // Always single language now
+    
+    // Process all tasks for this language
+    for (const taskId of batch.taskIds) {
+      const batchTask = await this.dbService.getEnhancedTask(taskId);
+      if (!batchTask) continue;
+      
+      const subTask = batchTask.languageSubTasks[batchLanguage];
       if (subTask && subTask.translatedText) {
         // Create a translation result object for CSV generation
         const translationResult: TranslationResult = {
-          language,
+          language: batchLanguage,
           translatedText: subTask.translatedText,
           reviewNotes: subTask.iterations.length > 0 
             ? [subTask.iterations[subTask.iterations.length - 1].llmVerification.feedback]
@@ -244,9 +281,9 @@ export class ProlificBatchManager {
         };
 
         const csvData = CsvGeneratorService.generateHumanReviewCsv(
-          task.id,
-          task.mediaArticle,
-          task.editorialGuidelines,
+          batchTask.id,
+          batchTask.mediaArticle,
+          batchTask.editorialGuidelines,
           translationResult
         );
 
@@ -298,42 +335,58 @@ export class ProlificBatchManager {
     // Setup batch and wait for it to be ready
     await this.prolificService.setupAndWaitForBatch(dataCollection.id, dataCollection.dataset_id);
 
-    // Calculate study parameters based on batch size and complexity
-    const avgWordsPerLanguage = batch.languages.reduce((sum, lang) => {
-      const subTask = task.languageSubTasks[lang];
-      return sum + (subTask?.translatedText?.split(' ').length || 0);
-    }, 0) / batch.languages.length;
-
+    // Calculate study parameters for single language, multiple tasks
+    const studyLanguage = batch.languages[0];
+    const numTasks = batch.taskIds.length;
+    
+    // Get average complexity across all tasks in this batch
+    let totalWords = 0;
+    let validTasks = 0;
+    
+    for (const taskId of batch.taskIds) {
+      const batchTask = await this.dbService.getEnhancedTask(taskId);
+      if (batchTask && batchTask.languageSubTasks[studyLanguage]?.translatedText) {
+        totalWords += batchTask.languageSubTasks[studyLanguage].translatedText.split(' ').length;
+        validTasks++;
+      }
+    }
+    
+    const avgWordsPerTask = validTasks > 0 ? totalWords / validTasks : 100;
+    
+    // Use the first task as representative for estimation
+    const firstTask = await this.dbService.getEnhancedTask(batch.taskIds[0]);
     const studyEstimate = StudyEstimationService.estimateStudyParameters(
-      task.mediaArticle,
-      task.editorialGuidelines,
-      { language: "multi", translatedText: `${avgWordsPerLanguage} avg words per ${batch.languages.length} languages` },
-      task.guide
+      firstTask!.mediaArticle,
+      firstTask!.editorialGuidelines,
+      { language: studyLanguage, translatedText: `${avgWordsPerTask} words average` },
+      firstTask!.guide as GuideType
     );
 
-    // Adjust estimates for multiple languages
+    // Adjust estimates for multiple tasks (more efficient than separate studies)
     const adjustedEstimate = {
       ...studyEstimate,
-      estimatedCompletionTimeMinutes: Math.ceil(studyEstimate.estimatedCompletionTimeMinutes * batch.languages.length * 0.8), // 80% efficiency for batching
-      rewardPence: Math.ceil(studyEstimate.rewardPence * batch.languages.length * 0.9), // 90% rate for batch work
-      maxAllowedTimeMinutes: Math.ceil(studyEstimate.maxAllowedTimeMinutes * batch.languages.length),
+      estimatedCompletionTimeMinutes: Math.ceil(studyEstimate.estimatedCompletionTimeMinutes * numTasks * 0.85), // 85% efficiency for batching same language
+      rewardPence: Math.ceil(studyEstimate.rewardPence * numTasks * 0.95), // 95% rate for batch work
+      maxAllowedTimeMinutes: Math.ceil(studyEstimate.maxAllowedTimeMinutes * numTasks * 1.2), // Extra time buffer
     };
 
-    console.log(`Batch study estimation:`, {
-      languages: batch.languages.length,
+    console.log(`Single-language batch study estimation:`, {
+      language: studyLanguage.toUpperCase(),
+      numTasks: numTasks,
+      avgWordsPerTask: Math.round(avgWordsPerTask),
       estimatedTime: adjustedEstimate.estimatedCompletionTimeMinutes,
       reward: adjustedEstimate.rewardPence,
       maxTime: adjustedEstimate.maxAllowedTimeMinutes,
     });
 
-    // Get study filters for all languages in the batch
+    // Get study filters for the single language in this batch
     const studyFilters = await this.prolificService.getStudyFilters(batch.languages);
 
-    // Create study
+    // Create study for single language, multiple tasks
     const studyData: CreateStudyRequest = {
       internal_name: `batch-review-${batch.batchId}`,
-      name: `Translation Review Batch: ${batch.languages.join(', ')}`,
-      description: `Review translation quality for ${batch.languages.length} languages in batch ${batch.batchId}`,
+      name: `${studyLanguage.toUpperCase()} Translation Review: ${numTasks} Tasks (Iteration ${batch.iterationNumbers[Object.keys(batch.iterationNumbers)[0]]})`,
+      description: `Review ${numTasks} ${studyLanguage.toUpperCase()} translations with consistent editorial context`,
       data_collection_method: "DC_TOOL",
       data_collection_id: dataCollection.id,
       total_available_places: 1, // Single reviewer for consistency
