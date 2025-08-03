@@ -38,6 +38,10 @@ app.get("/api", (req, res) => {
       health: "GET /api/health",
       tasks: "GET /api/tasks",
       task: "GET /api/tasks/:taskId",
+      languages: "GET /api/languages",
+      filters: "GET /api/filters",
+      filterRecommendations: "POST /api/filters/recommendations",
+      filterTest: "POST /api/filters/test",
     },
   });
 });

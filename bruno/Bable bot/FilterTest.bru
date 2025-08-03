@@ -1,0 +1,68 @@
+meta {
+  name: Test Filter Service
+  type: http
+  seq: 5
+}
+
+post {
+  url: http://localhost:3000/api/filters/test
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {}
+}
+
+docs {
+  # Test Filter Service
+  
+  Tests the filter service with sample data. If no request body is provided, uses built-in sample data.
+  You can also provide your own test data in the request body.
+  
+  ## Request Body (Optional)
+  Same structure as the filter recommendations endpoint. If empty, uses default sample data.
+  
+  ## Response
+  - `recommendations`: Array of filter recommendations
+  - `reasoning`: Overall strategy explanation
+  - `confidence`: Overall confidence score (1-100)
+  - `timestamp`: When the request was processed
+  - `testMode`: Always true for this endpoint
+  - `sampleData`: True if using built-in sample, false if using provided data
+  - `requestInfo`: Summary of the request parameters
+  
+  ## Sample Article Used (when no body provided)
+  - Title: "Financial Technology Innovations"
+  - Content: Article about fintech industry
+  - Target Languages: Spanish, French, German
+  - Task Type: technical_accuracy
+  - Expertise Level: intermediate
+  
+  ## Example Response
+  ```json
+  {
+    "recommendations": [
+      {
+        "filter_id": "age",
+        "title": "Age",
+        "reasoning": "Ensuring evaluators are mature enough to provide thoughtful feedback",
+        "confidence": 85,
+        "recommended_values": {
+          "min": 25,
+          "max": 65
+        }
+      }
+    ],
+    "reasoning": "Demo recommendations for Financial Technology Innovations targeting Spanish, French, German",
+    "confidence": 80,
+    "timestamp": "2024-01-01T12:00:00.000Z",
+    "testMode": true,
+    "sampleData": true
+  }
+  ```
+}

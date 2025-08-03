@@ -1,15 +1,18 @@
 import { Router, Request, Response } from "express";
 import { TaskService } from "../services/taskService";
 import { TranslationService } from "../services/translationService";
+import { FilterService } from "../services/filterService";
 import {
   TranslationRequest,
   TaskStatusResponse,
   TaskListResponse,
+  FilterRecommendationRequest,
 } from "../types";
 
 const router = Router();
 const taskService = new TaskService();
 const translationService = new TranslationService();
+const filterService = new FilterService();
 
 router.post("/translate", async (req: Request, res: Response) => {
   try {
@@ -137,6 +140,160 @@ router.delete("/tasks", async (req: Request, res: Response) => {
     console.error("Error deleting tasks:", error);
     res.status(500).json({
       error: "Internal server error",
+    });
+  }
+});
+
+// Filter endpoints
+router.get("/filters", async (req: Request, res: Response) => {
+  try {
+    const filters = await filterService.fetchAvailableFilters();
+    res.json({
+      filters,
+      count: filters.length,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Error fetching filters:", error);
+    res.status(500).json({
+      error: "Failed to fetch available filters",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+router.post("/filters/recommendations", async (req: Request, res: Response) => {
+  try {
+    const {
+      article,
+      targetLanguages,
+      evaluationContext,
+    }: FilterRecommendationRequest = req.body;
+
+    // Validate required fields
+    if (!article || !article.text) {
+      return res.status(400).json({
+        error: "Article with text is required",
+      });
+    }
+
+    if (!targetLanguages || targetLanguages.length === 0) {
+      return res.status(400).json({
+        error: "At least one target language is required",
+      });
+    }
+
+    // Validate target languages are strings
+    if (!targetLanguages.every((lang) => typeof lang === "string")) {
+      return res.status(400).json({
+        error: "All target languages must be strings",
+      });
+    }
+
+    // Validate evaluation context if provided
+    if (evaluationContext) {
+      const validTaskTypes = [
+        "translation_quality",
+        "cultural_adaptation",
+        "technical_accuracy",
+        "general_evaluation",
+      ];
+      const validExpertiseLevels = ["beginner", "intermediate", "expert"];
+
+      if (
+        evaluationContext.taskType &&
+        !validTaskTypes.includes(evaluationContext.taskType)
+      ) {
+        return res.status(400).json({
+          error: `Invalid taskType. Must be one of: ${validTaskTypes.join(
+            ", "
+          )}`,
+        });
+      }
+
+      if (
+        evaluationContext.expertiseLevel &&
+        !validExpertiseLevels.includes(evaluationContext.expertiseLevel)
+      ) {
+        return res.status(400).json({
+          error: `Invalid expertiseLevel. Must be one of: ${validExpertiseLevels.join(
+            ", "
+          )}`,
+        });
+      }
+    }
+
+    const recommendations = await filterService.getFilterRecommendations({
+      article,
+      targetLanguages,
+      evaluationContext,
+    });
+
+    res.json({
+      ...recommendations,
+      timestamp: new Date().toISOString(),
+      requestInfo: {
+        articleTitle: article.title || "Untitled",
+        articleLength: article.text.length,
+        targetLanguages,
+        evaluationContext: evaluationContext || null,
+      },
+    });
+  } catch (error) {
+    console.error("Error getting filter recommendations:", error);
+    res.status(500).json({
+      error: "Failed to get filter recommendations",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
+
+// Test endpoint with sample data
+router.post("/filters/test", async (req: Request, res: Response) => {
+  try {
+    const sampleRequest: FilterRecommendationRequest = {
+      article: {
+        title: "Financial Technology Innovations",
+        text: "The fintech industry has revolutionized banking and financial services through innovative digital solutions. Mobile banking apps, cryptocurrency platforms, and robo-advisors have transformed how consumers interact with financial institutions. These technologies have made financial services more accessible, efficient, and user-friendly than ever before.",
+        metadata: {
+          category: "finance",
+          complexity: "intermediate",
+          region: "global",
+        },
+      },
+      targetLanguages: ["Spanish", "French", "German"],
+      evaluationContext: {
+        taskType: "technical_accuracy",
+        expertiseLevel: "intermediate",
+        domainSpecific: true,
+      },
+    };
+
+    // Allow override with request body if provided
+    const requestData =
+      Object.keys(req.body).length > 0 ? req.body : sampleRequest;
+
+    const recommendations = await filterService.getFilterRecommendations(
+      requestData
+    );
+
+    res.json({
+      ...recommendations,
+      timestamp: new Date().toISOString(),
+      testMode: true,
+      sampleData: Object.keys(req.body).length === 0,
+      requestInfo: {
+        articleTitle: requestData.article.title || "Untitled",
+        articleLength: requestData.article.text.length,
+        targetLanguages: requestData.targetLanguages,
+        evaluationContext: requestData.evaluationContext || null,
+      },
+    });
+  } catch (error) {
+    console.error("Error in filter test endpoint:", error);
+    res.status(500).json({
+      error: "Filter test failed",
+      details: error instanceof Error ? error.message : "Unknown error",
     });
   }
 });
