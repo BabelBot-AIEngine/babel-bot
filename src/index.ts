@@ -4,6 +4,7 @@ import helmet from "helmet";
 import "@dotenvx/dotenvx/config";
 import path from "path";
 import translationRoutes from "./routes/translation";
+import { TaskService } from "./services/taskService";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,6 +49,22 @@ app.get("/api", (req, res) => {
 
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist/client/index.html"));
+});
+
+// Initialize services for graceful shutdown
+const taskService = new TaskService();
+
+// Graceful shutdown - stop all study polling
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, shutting down gracefully");
+  taskService.stopAllStudyPolling();
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received, shutting down gracefully");
+  taskService.stopAllStudyPolling();
+  process.exit(0);
 });
 
 app.listen(PORT, () => {

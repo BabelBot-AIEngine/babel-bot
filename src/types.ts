@@ -48,6 +48,14 @@ export interface TranslationResult {
   status?: LanguageTaskStatus;
   batchId?: string;
   studyId?: string;
+  humanReviewResponses?: Array<{
+    id: string;
+    batch_id: string;
+    participant_id: string;
+    response_text: string;
+    submitted_at: string;
+    metadata?: Record<string, any>;
+  }>;
 }
 
 export interface TranslationResponse {
@@ -138,13 +146,13 @@ export const getLanguagesForStatus = (
 ): string[] => {
   const languageStates = getLanguageStatesForTask(task);
   const languages: string[] = [];
-  
+
   languageStates.forEach((status, language) => {
     if (status === targetStatus) {
       languages.push(language);
     }
   });
-  
+
   return languages;
 };
 
@@ -153,17 +161,17 @@ export const getTaskDisplayInfoForStatus = (
   targetStatus: LanguageTaskStatus
 ): TaskCardDisplayInfo | null => {
   const languagesInStatus = getLanguagesForStatus(task, targetStatus);
-  
+
   if (languagesInStatus.length === 0) {
     return null;
   }
-  
+
   const isPartialDisplay = hasMultipleLanguageStates(task);
-  
+
   return {
     task,
     filteredLanguages: languagesInStatus,
-    isPartialDisplay
+    isPartialDisplay,
   };
 };
 
