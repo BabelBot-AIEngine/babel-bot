@@ -45,7 +45,7 @@ export interface Study {
   external_study_url: string;
   total_available_places: number;
   reward: number;
-  status: "UNPUBLISHED" | "ACTIVE" | "PAUSED" | "COMPLETED";
+  status: "UNPUBLISHED" | "ACTIVE" | "PAUSED" | "COMPLETED" | "AWAITING_REVIEW";
   completion_codes: CompletionCode[];
   device_compatibility: string[];
   estimated_completion_time: number;
@@ -201,4 +201,18 @@ export interface Project {
       href: string;
     };
   };
+}
+
+export interface TaskBuilderBatchResponse {
+  id: string;
+  batch_id: string;
+  participant_id: string;
+  response_text: string;
+  submitted_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface TaskBuilderBatchResponsesResult {
+  results: TaskBuilderBatchResponse[];
+  count: number;
 }

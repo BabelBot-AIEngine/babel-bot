@@ -185,7 +185,10 @@ export class TaskService {
 
       // Create a project for this specific task
       const projectTitle = `Translation Task ${taskId}`;
-      const project = await this.prolificService.ensureProjectExists(workspace.id, projectTitle);
+      const project = await this.prolificService.ensureProjectExists(
+        workspace.id,
+        projectTitle
+      );
       const humanReviewBatches: HumanReviewBatch[] = [];
       const updatedTranslations: TranslationResult[] = [];
 
@@ -250,7 +253,7 @@ export class TaskService {
           );
 
           console.log(`Creating study in workspace: ${config.workspaceId}`);
-          
+
           const studyData: CreateStudyRequest = {
             internal_name: `human-review-${taskId}-${translation.language}`,
             name: `Translation Review: ${translation.language}`,
@@ -276,7 +279,10 @@ export class TaskService {
             project: project.id,
           };
 
-          console.log('Study data being sent:', JSON.stringify(studyData, null, 2));
+          console.log(
+            "Study data being sent:",
+            JSON.stringify(studyData, null, 2)
+          );
 
           const study = await this.prolificService.createStudy(studyData);
 
@@ -446,5 +452,118 @@ export class TaskService {
     }
 
     return deletedCount;
+  }
+
+  async checkAndUpdateStudyStatuses(): Promise<void> {
+    try {
+      // Get all tasks with human review status
+      const humanReviewTasks = await this.getTasksByStatus("human_review");
+
+      for (const task of humanReviewTasks) {
+        if (task.humanReviewBatches && task.humanReviewBatches.length > 0) {
+          await this.processStudyUpdates(task);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking study statuses:", error);
+    }
+  }
+
+  private async processStudyUpdates(task: TranslationTask): Promise<void> {
+    if (!task.humanReviewBatches || !task.result?.translations) {
+      return;
+    }
+
+    let hasUpdates = false;
+    const updatedTranslations = [...task.result.translations];
+
+    for (const batch of task.humanReviewBatches) {
+      try {
+        const { study, responses } =
+          await this.prolificService.checkStudyStatusAndGetResponses(
+            batch.studyId,
+            batch.batchId
+          );
+
+        if (
+          study.status === "AWAITING_REVIEW" ||
+          study.status === "COMPLETED"
+        ) {
+          // Find the corresponding translation
+          const translationIndex = updatedTranslations.findIndex(
+            (t) => t.language === batch.language
+          );
+
+          if (translationIndex !== -1) {
+            const translation = updatedTranslations[translationIndex];
+            const reviewNotes = [...(translation.reviewNotes || [])];
+
+            // Add study status update
+            reviewNotes.push(
+              `Prolific study ${study.status.toLowerCase()}: ${study.id}`
+            );
+
+            // Add response text if available
+            if (responses && responses.length > 0) {
+              for (const response of responses) {
+                reviewNotes.push(
+                  `Human review response: ${response.response_text}`
+                );
+              }
+            }
+
+            // Update translation status based on study status
+            const newStatus =
+              study.status === "COMPLETED" ? "done" : "human_review";
+
+            updatedTranslations[translationIndex] = {
+              ...translation,
+              status: newStatus,
+              reviewNotes,
+              humanReviewResponses: responses,
+            };
+
+            hasUpdates = true;
+            console.log(
+              `Updated translation for ${batch.language} in task ${task.id}: study ${study.status}`
+            );
+          }
+        }
+      } catch (error) {
+        console.error(
+          `Error processing study ${batch.studyId} for task ${task.id}:`,
+          error
+        );
+      }
+    }
+
+    if (hasUpdates) {
+      const finalStatus = this.determineOverallTaskStatus(updatedTranslations);
+      const progress = finalStatus === "done" ? 100 : task.progress;
+
+      await this.dbService.updateTask(task.id, {
+        status: finalStatus,
+        progress,
+        result: {
+          ...task.result,
+          translations: updatedTranslations,
+        },
+      });
+
+      console.log(`Task ${task.id} updated to status: ${finalStatus}`);
+    }
+  }
+
+  startStudyPolling(intervalMs: number = 60000): NodeJS.Timeout {
+    console.log(`Starting study polling with ${intervalMs}ms interval`);
+
+    return setInterval(async () => {
+      await this.checkAndUpdateStudyStatuses();
+    }, intervalMs);
+  }
+
+  stopStudyPolling(intervalId: NodeJS.Timeout): void {
+    clearInterval(intervalId);
+    console.log("Study polling stopped");
   }
 }

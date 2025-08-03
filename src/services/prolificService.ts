@@ -15,6 +15,8 @@ import {
   Workspace,
   CreateProjectRequest,
   Project,
+  TaskBuilderBatchResponse,
+  TaskBuilderBatchResponsesResult,
 } from "../types/prolific";
 
 export class ProlificService {
@@ -33,7 +35,11 @@ export class ProlificService {
     workspaceId: string,
     batchName: string,
     datasetName: string,
-    taskDetails: { task_name: string; task_introduction: string; task_steps: string }
+    taskDetails: {
+      task_name: string;
+      task_introduction: string;
+      task_steps: string;
+    }
   ): Promise<Batch> {
     // Step 1: Create dataset
     const dataset = await this.createDataset({
@@ -42,7 +48,10 @@ export class ProlificService {
     });
 
     // Step 2: Get upload URL for CSV
-    const uploadResponse = await this.getUploadUrl(dataset.id, `${datasetName}.csv`);
+    const uploadResponse = await this.getUploadUrl(
+      dataset.id,
+      `${datasetName}.csv`
+    );
 
     // Step 3: Upload CSV data
     await this.uploadCsvData(uploadResponse.upload_url, csvData);
@@ -61,7 +70,9 @@ export class ProlificService {
     return batch;
   }
 
-  private async createDataset(datasetData: CreateDatasetRequest): Promise<Dataset> {
+  private async createDataset(
+    datasetData: CreateDatasetRequest
+  ): Promise<Dataset> {
     return this.makeRequest("/data-collection/datasets", {
       method: "POST",
       body: JSON.stringify(datasetData),
@@ -75,11 +86,19 @@ export class ProlificService {
     });
   }
 
-  private async getUploadUrl(datasetId: string, filename: string): Promise<UploadUrlResponse> {
-    return this.makeRequest(`/data-collection/datasets/${datasetId}/upload-url/${filename}`);
+  private async getUploadUrl(
+    datasetId: string,
+    filename: string
+  ): Promise<UploadUrlResponse> {
+    return this.makeRequest(
+      `/data-collection/datasets/${datasetId}/upload-url/${filename}`
+    );
   }
 
-  private async uploadCsvData(uploadUrl: string, csvData: string): Promise<void> {
+  private async uploadCsvData(
+    uploadUrl: string,
+    csvData: string
+  ): Promise<void> {
     const response = await fetch(uploadUrl, {
       method: "PUT",
       body: csvData,
@@ -89,7 +108,9 @@ export class ProlificService {
     });
 
     if (!response.ok) {
-      throw new Error(`CSV upload failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `CSV upload failed: ${response.status} ${response.statusText}`
+      );
     }
   }
 
@@ -97,30 +118,44 @@ export class ProlificService {
     return this.makeRequest(`/data-collection/datasets/${datasetId}/status`);
   }
 
-  private async waitForDatasetReady(datasetId: string, maxAttempts: number = 30, intervalMs: number = 2000): Promise<void> {
+  private async waitForDatasetReady(
+    datasetId: string,
+    maxAttempts: number = 30,
+    intervalMs: number = 2000
+  ): Promise<void> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const statusResponse = await this.getDatasetStatus(datasetId);
-      
+
       if (statusResponse.status === "READY") {
         return;
       }
-      
+
       if (statusResponse.status === "ERROR") {
         throw new Error(`Dataset ${datasetId} failed to process`);
       }
-      
+
       // Wait before next check
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
-    
-    throw new Error(`Dataset ${datasetId} did not become ready within ${maxAttempts * intervalMs / 1000} seconds`);
+
+    throw new Error(
+      `Dataset ${datasetId} did not become ready within ${
+        (maxAttempts * intervalMs) / 1000
+      } seconds`
+    );
   }
 
-  async createBatchInstructions(batchId: string, instructionsData: CreateBatchInstructionsRequest): Promise<BatchInstructions> {
-    return this.makeRequest(`/data-collection/batches/${batchId}/instructions`, {
-      method: "POST",
-      body: JSON.stringify(instructionsData),
-    });
+  async createBatchInstructions(
+    batchId: string,
+    instructionsData: CreateBatchInstructionsRequest
+  ): Promise<BatchInstructions> {
+    return this.makeRequest(
+      `/data-collection/batches/${batchId}/instructions`,
+      {
+        method: "POST",
+        body: JSON.stringify(instructionsData),
+      }
+    );
   }
 
   async getAllWorkspaces(): Promise<Workspace[]> {
@@ -128,7 +163,7 @@ export class ProlificService {
       const response = await this.makeRequest("/workspaces");
       return response.results || [];
     } catch (error) {
-      console.error('Error getting workspaces:', error);
+      console.error("Error getting workspaces:", error);
       throw error;
     }
   }
@@ -137,7 +172,9 @@ export class ProlificService {
     return this.makeRequest(`/workspaces/${workspaceId}/`);
   }
 
-  async createWorkspace(workspaceData: CreateWorkspaceRequest): Promise<Workspace> {
+  async createWorkspace(
+    workspaceData: CreateWorkspaceRequest
+  ): Promise<Workspace> {
     return this.makeRequest("/workspaces/", {
       method: "POST",
       body: JSON.stringify(workspaceData),
@@ -147,58 +184,71 @@ export class ProlificService {
   async findWorkspaceByTitle(title: string): Promise<Workspace | null> {
     try {
       const workspaces = await this.getAllWorkspaces();
-      return workspaces.find(workspace => workspace.title === title) || null;
+      return workspaces.find((workspace) => workspace.title === title) || null;
     } catch (error) {
-      console.error('Error finding workspace by title:', error);
+      console.error("Error finding workspace by title:", error);
       throw error;
     }
   }
 
   async ensureWorkspaceExists(title: string): Promise<Workspace> {
     const existingWorkspace = await this.findWorkspaceByTitle(title);
-    
+
     if (existingWorkspace) {
-      console.log(`Using existing workspace: ${title} (${existingWorkspace.id})`);
+      console.log(
+        `Using existing workspace: ${title} (${existingWorkspace.id})`
+      );
       return existingWorkspace;
     }
 
     console.log(`Creating new workspace: ${title}`);
     const newWorkspace = await this.createWorkspace({ title });
     console.log(`Created workspace: ${title} (${newWorkspace.id})`);
-    
+
     return newWorkspace;
   }
 
   async getProjectsForWorkspace(workspaceId: string): Promise<Project[]> {
     try {
-      const response = await this.makeRequest(`/workspaces/${workspaceId}/projects`);
+      const response = await this.makeRequest(
+        `/workspaces/${workspaceId}/projects`
+      );
       return response.results || [];
     } catch (error) {
-      console.error('Error getting projects for workspace:', error);
+      console.error("Error getting projects for workspace:", error);
       throw error;
     }
   }
 
-  async createProject(workspaceId: string, projectData: CreateProjectRequest): Promise<Project> {
+  async createProject(
+    workspaceId: string,
+    projectData: CreateProjectRequest
+  ): Promise<Project> {
     return this.makeRequest(`/workspaces/${workspaceId}/projects/`, {
       method: "POST",
       body: JSON.stringify(projectData),
     });
   }
 
-  async findProjectByTitle(workspaceId: string, title: string): Promise<Project | null> {
+  async findProjectByTitle(
+    workspaceId: string,
+    title: string
+  ): Promise<Project | null> {
     try {
       const projects = await this.getProjectsForWorkspace(workspaceId);
-      return projects.find(project => project.title === title) || null;
+      return projects.find((project) => project.title === title) || null;
     } catch (error) {
-      console.error('Error finding project by title:', error);
+      console.error("Error finding project by title:", error);
       throw error;
     }
   }
 
-  async ensureProjectExists(workspaceId: string, title: string): Promise<Project> {
+  async ensureProjectExists(
+    workspaceId: string,
+    title: string
+  ): Promise<Project> {
     const existingProject = await this.findProjectByTitle(workspaceId, title);
-    
+
     if (existingProject) {
       console.log(`Using existing project: ${title} (${existingProject.id})`);
       return existingProject;
@@ -207,7 +257,7 @@ export class ProlificService {
     console.log(`Creating new project: ${title} in workspace ${workspaceId}`);
     const newProject = await this.createProject(workspaceId, { title });
     console.log(`Created project: ${title} (${newProject.id})`);
-    
+
     return newProject;
   }
 
@@ -235,6 +285,64 @@ export class ProlificService {
 
   async getSubmissions(studyId: string): Promise<Submission[]> {
     return this.makeRequest(`/studies/${studyId}/submissions/`);
+  }
+
+  async getTaskBuilderBatchResponses(
+    batchId: string
+  ): Promise<TaskBuilderBatchResponsesResult> {
+    return this.makeRequest(
+      `/data-collection/batches/${batchId}/task-responses/`
+    );
+  }
+
+  async pollStudyUntilComplete(
+    studyId: string,
+    maxAttempts: number = 60,
+    intervalMs: number = 30000
+  ): Promise<Study> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const study = await this.getStudy(studyId);
+
+      if (study.status === "AWAITING_REVIEW" || study.status === "COMPLETED") {
+        return study;
+      }
+
+      // Wait before next check
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error(
+      `Study ${studyId} did not reach completion status within ${
+        (maxAttempts * intervalMs) / 1000
+      } seconds`
+    );
+  }
+
+  async checkStudyStatusAndGetResponses(
+    studyId: string,
+    batchId: string
+  ): Promise<{
+    study: Study;
+    responses?: TaskBuilderBatchResponse[];
+  }> {
+    const study = await this.getStudy(studyId);
+
+    if (study.status === "AWAITING_REVIEW" || study.status === "COMPLETED") {
+      try {
+        const responsesResult = await this.getTaskBuilderBatchResponses(
+          batchId
+        );
+        return {
+          study,
+          responses: responsesResult.results,
+        };
+      } catch (error) {
+        console.error(`Error fetching responses for batch ${batchId}:`, error);
+        return { study };
+      }
+    }
+
+    return { study };
   }
 
   private async makeRequest(
