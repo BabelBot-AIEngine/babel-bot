@@ -13,12 +13,23 @@ export interface SubmissionsConfig {
   max_submissions_per_participant?: number;
 }
 
+export interface StudyFilter {
+  filter_id: string;
+  selected_values?: string[];
+  selected_range?: {
+    lower: number;
+    upper: number;
+  };
+}
+
 export interface CreateStudyRequest {
   internal_name: string;
   name: string;
   description: string;
+  data_collection_method?: "DC_TOOL";
+  data_collection_id?: string;
   completion_codes: CompletionCode[];
-  external_study_url: string;
+  external_study_url?: string;
   total_available_places: number;
   reward: number;
   device_compatibility: ("desktop" | "mobile" | "tablet")[];
@@ -29,12 +40,13 @@ export interface CreateStudyRequest {
   submissions_config?: SubmissionsConfig;
   workspace_id?: string;
   project?: string;
-  prolific_id_option?: "required" | "not_required" | "question";
+  prolific_id_option?: "required" | "not_required" | "question" | "url_parameters";
   peripheral_requirements?: string[];
   selected_location?: string[];
   completion_option?: "code" | "url";
   quota_requirements?: any[];
   filter_set_id?: string;
+  filters?: StudyFilter[];
 }
 
 export interface Study {
@@ -94,6 +106,15 @@ export interface Dataset {
 
 export interface DatasetStatus {
   status: "UNINITIALISED" | "PROCESSING" | "READY" | "ERROR";
+}
+
+export interface BatchStatus {
+  status: "UNINITIALISED" | "PROCESSING" | "READY" | "ERROR";
+}
+
+export interface BatchSetupRequest {
+  dataset_id: string;
+  tasks_per_group: number;
 }
 
 export interface TaskDetails {
@@ -200,5 +221,59 @@ export interface Project {
       title: string;
       href: string;
     };
+  };
+}
+
+export interface CreateParticipantGroupRequest {
+  workspace_id: string;
+  name: string;
+  description?: string;
+  participant_ids: string[];
+}
+
+export interface ParticipantGroup {
+  id: string;
+  name: string;
+  description: string;
+  participant_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProlificFilterOption {
+  id: string;
+  name: string;
+  value?: string | number;
+}
+
+export interface ProlificFilterDefinition {
+  filter_id: string;
+  title: string;
+  description: string;
+  question?: string;
+  researcher_help_text?: string;
+  participant_help_text?: string;
+  category: string;
+  subcategory?: string;
+  display_order: number;
+  tags: string[];
+  type: "select" | "range" | "multiple_select";
+  data_type: "integer" | "float" | "string" | "boolean" | "date" | "ChoiceID" | "ParticipantID" | "StudyID" | "ParticipantGroupID";
+  min?: number;
+  max?: number;
+  choices?: { [key: string]: string };
+  options?: ProlificFilterOption[];
+}
+
+export interface ProlificFiltersResponse {
+  results: ProlificFilterDefinition[];
+  _links: {
+    self: { href: string; title: string };
+    next: { href: string | null; title: string };
+    previous: { href: string | null; title: string };
+    last: { href: string; title: string };
+  };
+  meta: {
+    count: number;
   };
 }

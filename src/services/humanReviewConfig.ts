@@ -1,5 +1,4 @@
 import { HumanReviewConfig } from "../types";
-import { createHash } from "crypto";
 
 export class HumanReviewConfigService {
   private static config: HumanReviewConfig | null = null;
@@ -36,10 +35,9 @@ export class HumanReviewConfigService {
       return this.workspaceId;
     }
 
-    // Return the generated workspace name - workspace creation will be handled in TaskService
-    const workspaceName = this.generateWorkspaceName();
-    this.workspaceId = workspaceName;
-    return workspaceName;
+    const workspaceId = this.getWorkspaceIdFromEnv();
+    this.workspaceId = workspaceId;
+    return workspaceId;
   }
 
   static setWorkspaceId(workspaceId: string): void {
@@ -49,17 +47,12 @@ export class HumanReviewConfigService {
     }
   }
 
-  static generateWorkspaceName(): string {
-    const apiKey = process.env.PROLIFIC_API_KEY;
-    if (!apiKey) {
-      throw new Error("PROLIFIC_API_KEY environment variable is required");
+  static getWorkspaceIdFromEnv(): string {
+    const workspaceId = process.env.PROLIFIC_WORKSPACE_ID;
+    if (!workspaceId) {
+      throw new Error("PROLIFIC_WORKSPACE_ID environment variable is required. Please set it to your funded Prolific workspace ID.");
     }
-
-    // Create a deterministic but human-friendly workspace name
-    // Hash the API key for security while maintaining determinism
-    const hash = createHash('sha256').update(apiKey).digest('hex');
-    const shortHash = hash.substring(0, 8); // Take first 8 characters of hash
-    return `babel-bot-translations-${shortHash}`;
+    return workspaceId;
   }
 
   static async updateConfig(updates: Partial<HumanReviewConfig>): Promise<void> {

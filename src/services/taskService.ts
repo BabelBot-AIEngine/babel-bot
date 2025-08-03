@@ -4,6 +4,7 @@ import { ProlificService } from "./prolificService";
 import { HumanReviewConfigService } from "./humanReviewConfig";
 import { CsvGeneratorService } from "./csvGenerator";
 import { ReviewService } from "./reviewService";
+import { StudyEstimationService } from "./studyEstimationService";
 import {
   MediaArticle,
   EditorialGuidelines,
@@ -177,20 +178,14 @@ export class TaskService {
 
       const config = await HumanReviewConfigService.getConfig();
 
-      // Ensure workspace exists (create if needed)
-      const workspaceName = HumanReviewConfigService.generateWorkspaceName();
-      const workspace = await this.prolificService.ensureWorkspaceExists(
-        workspaceName
-      );
-
-      // Update config with actual workspace ID
-      HumanReviewConfigService.setWorkspaceId(workspace.id);
-      config.workspaceId = workspace.id;
+      // Use the predefined workspace ID from environment variable
+      const workspaceId = config.workspaceId;
+      console.log(`Using workspace ID: ${workspaceId}`);
 
       // Create a project for this specific task
       const projectTitle = `Translation Task ${taskId}`;
       const project = await this.prolificService.ensureProjectExists(
-        workspace.id,
+        workspaceId,
         projectTitle
       );
       const humanReviewBatches: HumanReviewBatch[] = [];
@@ -256,21 +251,55 @@ export class TaskService {
             instructionsData
           );
 
+          // Setup batch and wait for it to be ready before creating study
+          await this.prolificService.setupAndWaitForBatch(batch.id, batch.dataset_id);
+
           console.log(`Creating study in workspace: ${config.workspaceId}`);
+
+          // Calculate dynamic study parameters
+          const studyEstimate = StudyEstimationService.estimateStudyParameters(
+            task.mediaArticle,
+            task.editorialGuidelines,
+            translation,
+            task.guide
+          );
+
+          console.log(`Study estimation for ${translation.language}:`, {
+            estimatedTime: studyEstimate.estimatedCompletionTimeMinutes,
+            reward: studyEstimate.rewardPence,
+            maxTime: studyEstimate.maxAllowedTimeMinutes,
+            reasoning: studyEstimate.reasoning,
+          });
+
+          // Get comprehensive study filters (participant groups + language fluency)
+          const studyFilters = await this.prolificService.getStudyFilters([translation.language]);
+          if (studyFilters.length > 0) {
+            console.log(
+              `Using study filters: ${studyFilters.map(f => {
+                if (f.selected_values) {
+                  return `${f.filter_id}=[${f.selected_values.join(', ')}]`;
+                } else if (f.selected_range) {
+                  return `${f.filter_id}=[${f.selected_range.lower}-${f.selected_range.upper}]`;
+                } else {
+                  return `${f.filter_id}=[unknown format]`;
+                }
+              }).join('; ')}`
+            );
+          }
 
           const studyData: CreateStudyRequest = {
             internal_name: `human-review-${taskId}-${translation.language}`,
             name: `Translation Review: ${translation.language}`,
             description:
               "Review translation quality and compliance with editorial guidelines",
-            external_study_url: `${
-              process.env.PROLIFIC_STUDY_URL || "https://app.prolific.com"
-            }/batch/${batch.id}`,
+            data_collection_method: "DC_TOOL",
+            data_collection_id: batch.id,
             total_available_places: 1,
-            reward: 50,
+            reward: studyEstimate.rewardPence,
             device_compatibility: ["desktop", "mobile", "tablet"],
-            estimated_completion_time: 10,
-            maximum_allowed_time: 30,
+            estimated_completion_time:
+              studyEstimate.estimatedCompletionTimeMinutes,
+            maximum_allowed_time: studyEstimate.maxAllowedTimeMinutes,
             study_type: "SINGLE",
             publish_at: null,
             completion_codes: [
@@ -281,6 +310,9 @@ export class TaskService {
               },
             ],
             project: project.id,
+            ...(studyFilters.length > 0 && {
+              filters: studyFilters,
+            }),
           };
 
           console.log(
