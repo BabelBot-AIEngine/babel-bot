@@ -322,6 +322,11 @@ export class TaskService {
 
           const study = await this.prolificService.createStudy(studyData);
 
+          // Publish the study immediately after creation
+          console.log(`Publishing study ${study.id}...`);
+          await this.prolificService.publishStudy(study.id);
+          console.log(`Study ${study.id} published successfully`);
+
           humanReviewBatches.push({
             language: translation.language,
             batchId: batch.id,
