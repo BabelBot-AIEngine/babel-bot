@@ -50,8 +50,14 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist/client/index.html"));
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📚 API documentation available at http://localhost:${PORT}/api`);
-  console.log(`🎨 UI available at http://localhost:${PORT}`);
-});
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📚 API documentation available at http://localhost:${PORT}/api`);
+    console.log(`🎨 UI available at http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel
+export default app;
