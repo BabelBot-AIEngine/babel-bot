@@ -12,7 +12,7 @@
     "test": "jest",
     "lint": "eslint src/**/*.ts",
     "typecheck": "tsc --noEmit",
-    "vercel-build": "npm run build",
+    "vercel-build": "npm run build && echo 'Build completed, checking dist:' && ls -la dist/",
     "preview": "vite preview"
   },
   "keywords": [
