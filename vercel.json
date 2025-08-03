@@ -2,10 +2,17 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 300
+    },
+    "api/webhooks/index.ts": {
+      "maxDuration": 30
     }
   },
   "outputDirectory": "dist/client",
   "rewrites": [
+    {
+      "source": "/api/webhooks",
+      "destination": "/api/webhooks/index.ts"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api/index.js"
