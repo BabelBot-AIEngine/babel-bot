@@ -447,16 +447,11 @@ export class EnhancedDatabaseService {
     // If the value is already an object (not a string), return it directly
     // This handles cases where Redis client auto-deserializes some fields
     if (typeof value === "object" && value !== null) {
-      console.debug(`Field ${fieldName} is already an object, returning as-is`);
       return value;
     }
 
     // If it's not a string at this point, convert to string first
     if (typeof value !== "string") {
-      console.warn(
-        `Field ${fieldName} is not a string or object, converting:`,
-        typeof value
-      );
       value = String(value);
     }
 
@@ -543,32 +538,6 @@ export class EnhancedDatabaseService {
     // This would be used to migrate existing tasks to the new schema
     // Implementation would depend on the specific migration strategy
     throw new Error("Migration not yet implemented");
-  }
-
-  // Diagnostic method to help debug Redis data types
-  async debugTaskData(id: string): Promise<void> {
-    const taskData = await this.redis.hgetall(`enhanced_task:${id}`);
-
-    console.log(`\n=== Debugging task data for ${id} ===`);
-    console.log("Raw taskData type:", typeof taskData);
-    console.log("Raw taskData keys:", Object.keys(taskData || {}));
-
-    if (taskData && typeof taskData === "object") {
-      for (const [key, value] of Object.entries(taskData)) {
-        console.log(`Field ${key}:`);
-        console.log(`  Type: ${typeof value}`);
-        console.log(
-          `  Value preview: ${String(value).substring(0, 100)}${
-            String(value).length > 100 ? "..." : ""
-          }`
-        );
-
-        if (typeof value === "object" && value !== null) {
-          console.log(`  Object keys: ${Object.keys(value)}`);
-        }
-      }
-    }
-    console.log("=== End debug ===\n");
   }
 
   async deleteEnhancedTask(id: string): Promise<void> {
