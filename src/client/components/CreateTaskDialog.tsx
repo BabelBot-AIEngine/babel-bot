@@ -14,6 +14,8 @@ import {
   Typography,
   SelectChangeEvent,
   CircularProgress,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import { useAuth } from "@clerk/clerk-react";
@@ -29,6 +31,7 @@ interface CreateTaskDialogProps {
     mediaArticle: { text: string; title?: string };
     editorialGuidelines: Record<string, any>;
     destinationLanguages: string[];
+    useEnhancedProcessing?: boolean;
   }) => void;
 }
 
@@ -49,6 +52,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
   >([]);
   const [languagesLoading, setLanguagesLoading] = useState(false);
   const [languagesError, setLanguagesError] = useState<string | null>(null);
+  const [useEnhancedProcessing, setUseEnhancedProcessing] = useState(true);
 
   useEffect(() => {
     const loadLanguages = async () => {
@@ -111,6 +115,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
         targetAudience: targetAudience.trim() || undefined,
       },
       destinationLanguages: selectedLanguages,
+      useEnhancedProcessing,
     });
 
     // Reset form
@@ -120,6 +125,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     setStyle("");
     setTargetAudience("");
     setSelectedLanguages([]);
+    setUseEnhancedProcessing(true);
   };
 
   const handleClose = () => {
@@ -129,6 +135,7 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
     setStyle("");
     setTargetAudience("");
     setSelectedLanguages([]);
+    setUseEnhancedProcessing(true);
     onClose();
   };
 
@@ -294,6 +301,61 @@ const CreateTaskDialog: React.FC<CreateTaskDialogProps> = ({
                 }}
               />
             </Box>
+          </Box>
+
+          <Box
+            sx={{
+              p: 3,
+              background: "linear-gradient(135deg, #fefce8 0%, #fef3c7 100%)",
+              border: "1px solid #fbbf24",
+              borderRadius: 2,
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{ mb: 2, color: "#92400e", fontWeight: 600 }}
+            >
+              Processing Mode
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 3, color: "#a16207" }}>
+              Choose between simple sequential processing or enhanced webhook-driven concurrent processing
+            </Typography>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={useEnhancedProcessing}
+                  onChange={(e) => setUseEnhancedProcessing(e.target.checked)}
+                  sx={{
+                    "& .MuiSwitch-switchBase.Mui-checked": {
+                      color: "#f59e0b",
+                      "&:hover": {
+                        backgroundColor: "rgba(245, 158, 11, 0.04)",
+                      },
+                    },
+                    "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                      backgroundColor: "#f59e0b",
+                    },
+                  }}
+                />
+              }
+              label={
+                <Box>
+                  <Typography
+                    variant="body1"
+                    sx={{ fontWeight: 600, color: "#92400e" }}
+                  >
+                    {useEnhancedProcessing ? "Enhanced Processing" : "Simple Processing"}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: "#a16207" }}>
+                    {useEnhancedProcessing
+                      ? "Webhook-driven, concurrent language processing with iterative review"
+                      : "Traditional sequential processing"}
+                  </Typography>
+                </Box>
+              }
+              sx={{ alignItems: "flex-start" }}
+            />
           </Box>
 
           <FormControl

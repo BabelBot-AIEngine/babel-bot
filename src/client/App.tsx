@@ -152,6 +152,7 @@ const App: React.FC = () => {
     mediaArticle: { text: string; title?: string };
     editorialGuidelines: Record<string, any>;
     destinationLanguages: string[];
+    useEnhancedProcessing?: boolean;
   }) => {
     try {
       const token = await getToken();

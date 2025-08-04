@@ -179,7 +179,8 @@ router.post("/translate", async (req: Request, res: Response) => {
       destinationLanguages,
       guide,
       useFullMarkdown,
-    }: TranslationRequest = req.body;
+      useEnhancedProcessing,
+    }: TranslationRequest & { useEnhancedProcessing?: boolean } = req.body;
 
     if (!mediaArticle || !mediaArticle.text) {
       return res.status(400).json({
@@ -204,7 +205,10 @@ router.post("/translate", async (req: Request, res: Response) => {
     let processingType: string;
     let pollUrl: string;
     
-    if (USE_ENHANCED_PROCESSING) {
+    // Use parameter from request, fallback to environment variable, default to enhanced
+    const shouldUseEnhanced = useEnhancedProcessing !== undefined ? useEnhancedProcessing : USE_ENHANCED_PROCESSING;
+    
+    if (shouldUseEnhanced) {
       // Use enhanced webhook-driven processing
       taskId = await enhancedTaskService.createTranslationTask(
         mediaArticle,
@@ -235,7 +239,7 @@ router.post("/translate", async (req: Request, res: Response) => {
       message: `Translation task created successfully (${processingType} processing)`,
       pollUrl,
       processingType,
-      enhancedFeatures: USE_ENHANCED_PROCESSING ? {
+      enhancedFeatures: shouldUseEnhanced ? {
         concurrentLanguages: true,
         iterativeReview: true,
         maxIterations: 3,
