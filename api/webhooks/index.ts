@@ -148,12 +148,23 @@ async function handleBabelWebhook(
   headers: Record<string, string>,
   body: any
 ): Promise<void> {
+  console.log("[WEBHOOK-ENDPOINT] 📨 Received Babel webhook");
+  console.log("[WEBHOOK-ENDPOINT] Headers:", Object.keys(headers));
+  console.log("[WEBHOOK-ENDPOINT] Body:", JSON.stringify(body, null, 2));
+
   const signature = headers["x-babel-request-signature"];
   const timestamp = headers["x-babel-request-timestamp"];
   const secret = process.env.BABEL_WEBHOOK_SECRET;
 
+  console.log("[WEBHOOK-ENDPOINT] 🔍 Validating webhook headers");
+  console.log("[WEBHOOK-ENDPOINT] Has signature:", !!signature);
+  console.log("[WEBHOOK-ENDPOINT] Has timestamp:", !!timestamp);
+  console.log("[WEBHOOK-ENDPOINT] Has secret:", !!secret);
+
   if (!secret) {
-    console.error("BABEL_WEBHOOK_SECRET environment variable not configured");
+    console.error(
+      "[WEBHOOK-ENDPOINT] ❌ BABEL_WEBHOOK_SECRET environment variable not configured"
+    );
     res.status(500).json({
       error: "Configuration Error",
       message: "Webhook secret not configured",
@@ -162,10 +173,13 @@ async function handleBabelWebhook(
   }
 
   if (!signature || !timestamp) {
-    console.error("Missing required Babel webhook headers:", {
-      hasSignature: !!signature,
-      hasTimestamp: !!timestamp,
-    });
+    console.error(
+      "[WEBHOOK-ENDPOINT] ❌ Missing required Babel webhook headers:",
+      {
+        hasSignature: !!signature,
+        hasTimestamp: !!timestamp,
+      }
+    );
     res.status(401).json({
       error: "Unauthorized",
       message: "Missing required headers",
@@ -174,6 +188,7 @@ async function handleBabelWebhook(
   }
 
   // Verify webhook signature
+  console.log("[WEBHOOK-ENDPOINT] 🔐 Verifying webhook signature");
   const rawBody = JSON.stringify(body);
   const verification = WebhookVerificationService.verifyBabelWebhook(
     rawBody,
@@ -183,31 +198,42 @@ async function handleBabelWebhook(
   );
 
   if (!verification.isValid) {
-    console.error("Babel webhook verification failed:", verification.error);
+    console.error(
+      "[WEBHOOK-ENDPOINT] ❌ Babel webhook verification failed:",
+      verification.error
+    );
     res.status(401).json({
       error: "Unauthorized",
       message: verification.error || "Invalid signature",
     });
     return;
   }
+  console.log("[WEBHOOK-ENDPOINT] ✅ Webhook signature verified");
 
   // Validate payload structure
+  console.log("[WEBHOOK-ENDPOINT] 🔍 Validating payload structure");
   if (!BabelWebhookHandler.validatePayload(body)) {
-    console.error("Invalid Babel webhook payload structure:", body);
+    console.error(
+      "[WEBHOOK-ENDPOINT] ❌ Invalid Babel webhook payload structure:",
+      body
+    );
     res.status(400).json({
       error: "Bad Request",
       message: "Invalid payload structure",
     });
     return;
   }
+  console.log("[WEBHOOK-ENDPOINT] ✅ Payload structure validated");
 
   // Respond immediately after validation
+  console.log("[WEBHOOK-ENDPOINT] 📤 Sending immediate 200 OK response");
   res.status(200).json({
     success: true,
     message: "Webhook received and will be processed",
   });
 
   // Process the webhook asynchronously (don't await)
+  console.log("[WEBHOOK-ENDPOINT] 🚀 Starting async webhook processing");
   BabelWebhookHandler.handleWebhook(body)
     .then(() => {
       console.log("Babel webhook processed successfully:", {

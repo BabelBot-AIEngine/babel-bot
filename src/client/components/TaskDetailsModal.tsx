@@ -550,9 +550,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             iconPosition="start"
             sx={{ minHeight: 60 }}
           />
-          {task.result && (
+          {getAvailableTranslations(task).length > 0 && (
             <Tab
-              label={`Translations (${task.result.translations.length})`}
+              label={`Translations (${getAvailableTranslations(task).length})`}
               icon={<TranslatingIcon />}
               iconPosition="start"
               sx={{ minHeight: 60 }}
@@ -1415,7 +1415,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
 
         {/* Enhanced Details Tab */}
         {isEnhancedTask(task) && (
-          <TabPanel value={tabValue} index={task.result ? 3 : 2}>
+          <TabPanel
+            value={tabValue}
+            index={getAvailableTranslations(task).length > 0 ? 3 : 2}
+          >
             <Box sx={{ px: 4 }}>
               <Typography
                 variant="h6"

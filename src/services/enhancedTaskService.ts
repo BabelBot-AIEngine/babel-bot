@@ -17,11 +17,7 @@ import {
   SubTaskFinalizedEvent,
   TaskCompletedEvent,
 } from "../types/enhanced-task";
-import {
-  MediaArticle,
-  EditorialGuidelines,
-  GuideType,
-} from "../types";
+import { MediaArticle, EditorialGuidelines, GuideType } from "../types";
 
 export class EnhancedTaskService {
   private dbService: EnhancedDatabaseService;
@@ -36,9 +32,9 @@ export class EnhancedTaskService {
     this.translationService = new TranslationService();
     this.reviewService = new ReviewService();
     this.batchManager = new ProlificBatchManager();
-    this.webhookUrl = process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}/api/webhooks` 
-      : `${process.env.BASE_URL || 'http://localhost:3000'}/api/webhooks`;
+    this.webhookUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}/api/webhooks`
+      : `${process.env.BASE_URL || "http://localhost:3000"}/api/webhooks`;
     this.webhookSecret = process.env.BABEL_WEBHOOK_SECRET!;
 
     if (!this.webhookSecret) {
@@ -55,7 +51,16 @@ export class EnhancedTaskService {
     maxReviewIterations: number = 3,
     confidenceThreshold: number = 4.5
   ): Promise<string> {
+    console.log(`[ENHANCED-TASK] 🎬 Creating enhanced translation task`);
+    console.log(
+      `[ENHANCED-TASK] Languages: ${destinationLanguages.join(", ")}`
+    );
+    console.log(`[ENHANCED-TASK] Guide: ${guide || "none"}`);
+    console.log(`[ENHANCED-TASK] Max iterations: ${maxReviewIterations}`);
+    console.log(`[ENHANCED-TASK] Confidence threshold: ${confidenceThreshold}`);
+
     // Create the enhanced task
+    console.log(`[ENHANCED-TASK] 💾 Storing task in database`);
     const taskId = await this.dbService.createEnhancedTask({
       status: "pending",
       mediaArticle,
@@ -68,7 +73,12 @@ export class EnhancedTaskService {
       confidenceThreshold,
     });
 
-    console.log(`Created enhanced task ${taskId} with ${destinationLanguages.length} languages`);
+    console.log(
+      `[ENHANCED-TASK] ✅ Created enhanced task ${taskId} with ${destinationLanguages.length} languages`
+    );
+    console.log(
+      `[ENHANCED-TASK] Webhook URL configured as: ${this.webhookUrl}`
+    );
 
     // Send task.created webhook to trigger processing
     const taskCreatedEvent: TaskCreatedEvent = {
@@ -83,27 +93,55 @@ export class EnhancedTaskService {
       },
     };
 
+    console.log(`[ENHANCED-TASK] 📡 Sending initial task.created webhook`);
     await this.sendWebhook(taskCreatedEvent);
+    console.log(
+      `[ENHANCED-TASK] 🎉 Task creation complete, returning taskId: ${taskId}`
+    );
     return taskId;
   }
 
   // Webhook handlers for each stage of processing
   async handleTaskCreated(payload: TaskCreatedEvent): Promise<void> {
-    console.log(`Handling task.created for ${payload.taskId}`);
-    
+    console.log(
+      `[ENHANCED-TASK] 🚀 Handling task.created for ${payload.taskId}`
+    );
+    console.log(`[ENHANCED-TASK] Payload:`, JSON.stringify(payload, null, 2));
+
     const task = await this.dbService.getEnhancedTask(payload.taskId);
     if (!task) {
+      console.error(
+        `[ENHANCED-TASK] ❌ Task ${payload.taskId} not found in database`
+      );
       throw new Error(`Task ${payload.taskId} not found`);
     }
+    console.log(
+      `[ENHANCED-TASK] ✅ Found task ${payload.taskId}, current status: ${task.status}`
+    );
 
     // Update task status to processing
+    console.log(
+      `[ENHANCED-TASK] 📝 Updating task ${payload.taskId} to status: processing`
+    );
     await this.dbService.updateEnhancedTask(payload.taskId, {
       status: "processing",
       progress: 10,
     });
+    console.log(
+      `[ENHANCED-TASK] ✅ Updated task ${payload.taskId} status to processing`
+    );
+
+    console.log(
+      `[ENHANCED-TASK] 🌍 Creating language sub-tasks for ${
+        payload.data.destinationLanguages.length
+      } languages: ${payload.data.destinationLanguages.join(", ")}`
+    );
 
     // Create language sub-task webhooks for each destination language
     for (const language of payload.data.destinationLanguages) {
+      console.log(
+        `[ENHANCED-TASK] 📤 Creating language sub-task webhook for ${language}`
+      );
       const subTaskEvent: LanguageSubTaskCreatedEvent = {
         event: "language_subtask.created",
         taskId: payload.taskId,
@@ -119,14 +157,35 @@ export class EnhancedTaskService {
         },
       };
 
+      console.log(
+        `[ENHANCED-TASK] 🌐 Sending language_subtask.created webhook for ${language}`
+      );
       await this.sendWebhook(subTaskEvent);
+      console.log(
+        `[ENHANCED-TASK] ✅ Sent language_subtask.created webhook for ${language}`
+      );
     }
+
+    console.log(
+      `[ENHANCED-TASK] 🎉 Completed task.created handling for ${payload.taskId}`
+    );
   }
 
-  async handleLanguageSubTaskCreated(payload: LanguageSubTaskCreatedEvent): Promise<void> {
-    console.log(`Handling language_subtask.created for ${payload.data.language} in task ${payload.taskId}`);
-    
+  async handleLanguageSubTaskCreated(
+    payload: LanguageSubTaskCreatedEvent
+  ): Promise<void> {
+    console.log(
+      `[ENHANCED-TASK] 🌍 Handling language_subtask.created for ${payload.data.language} in task ${payload.taskId}`
+    );
+    console.log(
+      `[ENHANCED-TASK] SubTask payload:`,
+      JSON.stringify(payload, null, 2)
+    );
+
     // Start translation for this language
+    console.log(
+      `[ENHANCED-TASK] 🔄 Starting translation process for ${payload.data.language}`
+    );
     const translationStartedEvent: TranslationStartedEvent = {
       event: "subtask.translation.started",
       taskId: payload.taskId,
@@ -140,18 +199,38 @@ export class EnhancedTaskService {
     };
 
     // Update sub-task status
-    await this.dbService.updateLanguageSubTask(payload.taskId, payload.data.language, {
-      status: "translating",
-      currentIteration: 1,
-      processingStartTime: new Date().toISOString(),
-    });
+    console.log(
+      `[ENHANCED-TASK] 📝 Updating sub-task ${payload.data.language} to translating status`
+    );
+    await this.dbService.updateLanguageSubTask(
+      payload.taskId,
+      payload.data.language,
+      {
+        status: "translating",
+        currentIteration: 1,
+        processingStartTime: new Date().toISOString(),
+      }
+    );
+    console.log(
+      `[ENHANCED-TASK] ✅ Updated sub-task ${payload.data.language} status to translating`
+    );
 
+    console.log(
+      `[ENHANCED-TASK] 🌐 Sending subtask.translation.started webhook for ${payload.data.language}`
+    );
     await this.sendWebhook(translationStartedEvent);
+    console.log(
+      `[ENHANCED-TASK] ✅ Sent subtask.translation.started webhook for ${payload.data.language}`
+    );
   }
 
-  async handleTranslationStarted(payload: TranslationStartedEvent): Promise<void> {
-    console.log(`Handling subtask.translation.started for ${payload.data.language} in task ${payload.taskId}`);
-    
+  async handleTranslationStarted(
+    payload: TranslationStartedEvent
+  ): Promise<void> {
+    console.log(
+      `Handling subtask.translation.started for ${payload.data.language} in task ${payload.taskId}`
+    );
+
     const task = await this.dbService.getEnhancedTask(payload.taskId);
     if (!task) {
       throw new Error(`Task ${payload.taskId} not found`);
@@ -173,10 +252,14 @@ export class EnhancedTaskService {
       const translationTime = Date.now() - startTime;
 
       // Update sub-task with translation result
-      await this.dbService.updateLanguageSubTask(payload.taskId, payload.data.language, {
-        status: "translation_complete",
-        translatedText: translation.translatedText,
-      });
+      await this.dbService.updateLanguageSubTask(
+        payload.taskId,
+        payload.data.language,
+        {
+          status: "translation_complete",
+          translatedText: translation.translatedText,
+        }
+      );
 
       // Send translation completed webhook
       const translationCompletedEvent: TranslationCompletedEvent = {
@@ -195,19 +278,34 @@ export class EnhancedTaskService {
 
       await this.sendWebhook(translationCompletedEvent);
     } catch (error) {
-      console.error(`Translation failed for ${payload.data.language} in task ${payload.taskId}:`, error);
-      
-      await this.dbService.updateLanguageSubTask(payload.taskId, payload.data.language, {
-        status: "failed",
-      });
+      console.error(
+        `Translation failed for ${payload.data.language} in task ${payload.taskId}:`,
+        error
+      );
 
-      await this.handleLanguageSubTaskFailed(payload.taskId, payload.data.language, error);
+      await this.dbService.updateLanguageSubTask(
+        payload.taskId,
+        payload.data.language,
+        {
+          status: "failed",
+        }
+      );
+
+      await this.handleLanguageSubTaskFailed(
+        payload.taskId,
+        payload.data.language,
+        error
+      );
     }
   }
 
-  async handleTranslationCompleted(payload: TranslationCompletedEvent): Promise<void> {
-    console.log(`Handling subtask.translation.completed for ${payload.data.language} in task ${payload.taskId}`);
-    
+  async handleTranslationCompleted(
+    payload: TranslationCompletedEvent
+  ): Promise<void> {
+    console.log(
+      `Handling subtask.translation.completed for ${payload.data.language} in task ${payload.taskId}`
+    );
+
     // Start LLM verification
     const verificationStartedEvent: LLMVerificationStartedEvent = {
       event: "subtask.llm_verification.started",
@@ -222,16 +320,24 @@ export class EnhancedTaskService {
       },
     };
 
-    await this.dbService.updateLanguageSubTask(payload.taskId, payload.data.language, {
-      status: "llm_verifying",
-    });
+    await this.dbService.updateLanguageSubTask(
+      payload.taskId,
+      payload.data.language,
+      {
+        status: "llm_verifying",
+      }
+    );
 
     await this.sendWebhook(verificationStartedEvent);
   }
 
-  async handleLLMVerificationStarted(payload: LLMVerificationStartedEvent): Promise<void> {
-    console.log(`Handling subtask.llm_verification.started for ${payload.data.language} in task ${payload.taskId}`);
-    
+  async handleLLMVerificationStarted(
+    payload: LLMVerificationStartedEvent
+  ): Promise<void> {
+    console.log(
+      `Handling subtask.llm_verification.started for ${payload.data.language} in task ${payload.taskId}`
+    );
+
     const task = await this.dbService.getEnhancedTask(payload.taskId);
     if (!task) {
       throw new Error(`Task ${payload.taskId} not found`);
@@ -239,7 +345,9 @@ export class EnhancedTaskService {
 
     const subTask = task.languageSubTasks[payload.data.language];
     if (!subTask || !subTask.translatedText) {
-      throw new Error(`No translation found for ${payload.data.language} in task ${payload.taskId}`);
+      throw new Error(
+        `No translation found for ${payload.data.language} in task ${payload.taskId}`
+      );
     }
 
     try {
@@ -254,9 +362,13 @@ export class EnhancedTaskService {
       const needsHumanReview = verificationScore < task.confidenceThreshold;
 
       // Update sub-task status
-      await this.dbService.updateLanguageSubTask(payload.taskId, payload.data.language, {
-        status: "llm_verified",
-      });
+      await this.dbService.updateLanguageSubTask(
+        payload.taskId,
+        payload.data.language,
+        {
+          status: "llm_verified",
+        }
+      );
 
       // Send verification completed webhook
       const verificationCompletedEvent: LLMVerificationCompletedEvent = {
@@ -276,19 +388,34 @@ export class EnhancedTaskService {
 
       await this.sendWebhook(verificationCompletedEvent);
     } catch (error) {
-      console.error(`LLM verification failed for ${payload.data.language} in task ${payload.taskId}:`, error);
-      
-      await this.dbService.updateLanguageSubTask(payload.taskId, payload.data.language, {
-        status: "failed",
-      });
+      console.error(
+        `LLM verification failed for ${payload.data.language} in task ${payload.taskId}:`,
+        error
+      );
 
-      await this.handleLanguageSubTaskFailed(payload.taskId, payload.data.language, error);
+      await this.dbService.updateLanguageSubTask(
+        payload.taskId,
+        payload.data.language,
+        {
+          status: "failed",
+        }
+      );
+
+      await this.handleLanguageSubTaskFailed(
+        payload.taskId,
+        payload.data.language,
+        error
+      );
     }
   }
 
-  async handleLLMVerificationCompleted(payload: LLMVerificationCompletedEvent): Promise<void> {
-    console.log(`Handling subtask.llm_verification.completed for ${payload.data.language} in task ${payload.taskId}`);
-    
+  async handleLLMVerificationCompleted(
+    payload: LLMVerificationCompletedEvent
+  ): Promise<void> {
+    console.log(
+      `Handling subtask.llm_verification.completed for ${payload.data.language} in task ${payload.taskId}`
+    );
+
     const task = await this.dbService.getEnhancedTask(payload.taskId);
     if (!task) {
       throw new Error(`Task ${payload.taskId} not found`);
@@ -314,12 +441,18 @@ export class EnhancedTaskService {
 
     if (payload.data.needsHumanReview) {
       // Mark as ready for human review
-      await this.dbService.updateLanguageSubTask(payload.taskId, payload.data.language, {
-        status: "review_ready",
-      });
+      await this.dbService.updateLanguageSubTask(
+        payload.taskId,
+        payload.data.language,
+        {
+          status: "review_ready",
+        }
+      );
 
-      console.log(`Language ${payload.data.language} marked as ready for human review`);
-      
+      console.log(
+        `Language ${payload.data.language} marked as ready for human review`
+      );
+
       // Trigger batch processing for ready language sub-tasks
       // This will be handled by a periodic process or immediate batching
       setTimeout(async () => {
@@ -352,7 +485,7 @@ export class EnhancedTaskService {
     }
 
     const subTask = task.languageSubTasks[language];
-    const processingTime = subTask.processingStartTime 
+    const processingTime = subTask.processingStartTime
       ? Date.now() - new Date(subTask.processingStartTime).getTime()
       : 0;
 
@@ -391,39 +524,58 @@ export class EnhancedTaskService {
       return;
     }
 
-    const allFinalized = Object.values(task.languageSubTasks)
-      .every(subTask => subTask.status === "finalized" || subTask.status === "failed");
+    const allFinalized = Object.values(task.languageSubTasks).every(
+      (subTask) => subTask.status === "finalized" || subTask.status === "failed"
+    );
 
     if (allFinalized) {
-      const completedLanguages = Object.keys(task.languageSubTasks)
-        .filter(lang => task.languageSubTasks[lang].status === "finalized");
+      const completedLanguages = Object.keys(task.languageSubTasks).filter(
+        (lang) => task.languageSubTasks[lang].status === "finalized"
+      );
 
       const totalProcessingTime = Math.max(
         ...Object.values(task.languageSubTasks)
-          .filter(subTask => subTask.processingStartTime && subTask.processingEndTime)
-          .map(subTask => 
-            new Date(subTask.processingEndTime!).getTime() - 
-            new Date(subTask.processingStartTime!).getTime()
+          .filter(
+            (subTask) =>
+              subTask.processingStartTime && subTask.processingEndTime
+          )
+          .map(
+            (subTask) =>
+              new Date(subTask.processingEndTime!).getTime() -
+              new Date(subTask.processingStartTime!).getTime()
           )
       );
 
-      const averageScore = completedLanguages.length > 0 
-        ? completedLanguages.reduce((sum, lang) => {
-            const iterations = task.languageSubTasks[lang].iterations;
-            const lastIteration = iterations[iterations.length - 1];
-            return sum + (lastIteration?.combinedScore || lastIteration?.llmVerification.score || 0);
-          }, 0) / completedLanguages.length
-        : 0;
+      const averageScore =
+        completedLanguages.length > 0
+          ? completedLanguages.reduce((sum, lang) => {
+              const iterations = task.languageSubTasks[lang].iterations;
+              const lastIteration = iterations[iterations.length - 1];
+              return (
+                sum +
+                (lastIteration?.combinedScore ||
+                  lastIteration?.llmVerification.score ||
+                  0)
+              );
+            }, 0) / completedLanguages.length
+          : 0;
 
       const iterationSummary = Object.fromEntries(
-        completedLanguages.map(lang => {
+        completedLanguages.map((lang) => {
           const subTask = task.languageSubTasks[lang];
-          const lastIteration = subTask.iterations[subTask.iterations.length - 1];
-          return [lang, {
-            iterations: subTask.currentIteration,
-            finalScore: lastIteration?.combinedScore || lastIteration?.llmVerification.score || 0,
-            reason: lastIteration?.finalReason || "unknown",
-          }];
+          const lastIteration =
+            subTask.iterations[subTask.iterations.length - 1];
+          return [
+            lang,
+            {
+              iterations: subTask.currentIteration,
+              finalScore:
+                lastIteration?.combinedScore ||
+                lastIteration?.llmVerification.score ||
+                0,
+              reason: lastIteration?.finalReason || "unknown",
+            },
+          ];
         })
       );
 
@@ -449,7 +601,9 @@ export class EnhancedTaskService {
       };
 
       await this.sendWebhook(completedEvent);
-      console.log(`Task ${taskId} completed with ${completedLanguages.length} languages`);
+      console.log(
+        `Task ${taskId} completed with ${completedLanguages.length} languages`
+      );
     }
   }
 
@@ -458,22 +612,55 @@ export class EnhancedTaskService {
     language: string,
     error: any
   ): Promise<void> {
-    console.error(`Language sub-task ${language} failed for task ${taskId}:`, error);
-    
+    console.error(
+      `Language sub-task ${language} failed for task ${taskId}:`,
+      error
+    );
+
     // Check if all languages have failed or completed
     await this.checkTaskCompletion(taskId);
   }
 
   private async sendWebhook(event: any): Promise<void> {
+    console.log(
+      `[ENHANCED-WEBHOOK] 📡 Sending webhook: ${event.event} to ${this.webhookUrl}`
+    );
+    console.log(
+      `[ENHANCED-WEBHOOK] Event payload:`,
+      JSON.stringify(event, null, 2)
+    );
+
     try {
+      const startTime = Date.now();
       await WebhookSender.sendBabelWebhook(
         this.webhookUrl,
         event,
         this.webhookSecret
       );
+      const duration = Date.now() - startTime;
+      console.log(
+        `[ENHANCED-WEBHOOK] ✅ Successfully sent webhook ${event.event} (${duration}ms)`
+      );
+
+      // Track webhook success
+      if (event.taskId) {
+        await this.dbService.addWebhookAttempt(event.taskId, {
+          eventType: event.event,
+          url: this.webhookUrl,
+          attempt: 1,
+          status: "success",
+          createdAt: new Date().toISOString(),
+          lastAttemptAt: new Date().toISOString(),
+        });
+      }
     } catch (error) {
-      console.error(`Failed to send webhook for event ${event.event}:`, error);
-      
+      console.error(
+        `[ENHANCED-WEBHOOK] ❌ Failed to send webhook for event ${event.event}:`,
+        error
+      );
+      console.error(`[ENHANCED-WEBHOOK] Webhook URL: ${this.webhookUrl}`);
+      console.error(`[ENHANCED-WEBHOOK] Error details:`, error);
+
       // Track webhook failure
       if (event.taskId) {
         await this.dbService.addWebhookAttempt(event.taskId, {
@@ -482,8 +669,12 @@ export class EnhancedTaskService {
           attempt: 1,
           status: "failed",
           createdAt: new Date().toISOString(),
+          lastAttemptAt: new Date().toISOString(),
         });
       }
+
+      // Re-throw to maintain error handling behavior
+      throw error;
     }
   }
 
@@ -496,7 +687,9 @@ export class EnhancedTaskService {
     return this.dbService.getAllEnhancedTasks();
   }
 
-  async getTasksByStatus(status: TaskStatus): Promise<EnhancedTranslationTask[]> {
+  async getTasksByStatus(
+    status: TaskStatus
+  ): Promise<EnhancedTranslationTask[]> {
     return this.dbService.getTasksByStatus(status);
   }
 }
