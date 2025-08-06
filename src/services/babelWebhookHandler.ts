@@ -46,10 +46,18 @@ export class BabelWebhookHandler {
         // New webhook-driven architecture events
         case "task.created":
           console.log(`[WEBHOOK-HANDLER] ➡️ Routing to handleTaskCreated`);
-          await this.enhancedTaskService.handleTaskCreated(
-            payload as TaskCreatedEvent
-          );
-          console.log(`[WEBHOOK-HANDLER] ✅ Completed handleTaskCreated`);
+          try {
+            await this.enhancedTaskService.handleTaskCreated(
+              payload as TaskCreatedEvent
+            );
+            console.log(`[WEBHOOK-HANDLER] ✅ Completed handleTaskCreated`);
+          } catch (error) {
+            console.error(
+              `[WEBHOOK-HANDLER] ❌ handleTaskCreated threw an error:`,
+              error
+            );
+            throw error; // Re-throw to maintain error handling
+          }
           break;
         case "language_subtask.created":
           console.log(

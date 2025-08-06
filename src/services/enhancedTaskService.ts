@@ -80,6 +80,12 @@ export class EnhancedTaskService {
       `[ENHANCED-TASK] Webhook URL configured as: ${this.webhookUrl}`
     );
 
+    // Brief delay to ensure database transaction is fully committed
+    console.log(
+      `[ENHANCED-TASK] ⏳ Waiting 100ms to ensure task is committed to database`
+    );
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     // Send task.created webhook to trigger processing
     const taskCreatedEvent: TaskCreatedEvent = {
       event: "task.created",
@@ -103,72 +109,114 @@ export class EnhancedTaskService {
 
   // Webhook handlers for each stage of processing
   async handleTaskCreated(payload: TaskCreatedEvent): Promise<void> {
-    console.log(
-      `[ENHANCED-TASK] 🚀 Handling task.created for ${payload.taskId}`
-    );
-    console.log(`[ENHANCED-TASK] Payload:`, JSON.stringify(payload, null, 2));
+    try {
+      console.log(
+        `[ENHANCED-TASK] 🚀 Handling task.created for ${payload.taskId}`
+      );
+      console.log(`[ENHANCED-TASK] Payload:`, JSON.stringify(payload, null, 2));
 
-    const task = await this.dbService.getEnhancedTask(payload.taskId);
-    if (!task) {
+      console.log(`[ENHANCED-TASK] 🧪 About to start database lookup`);
+      console.log(
+        `[ENHANCED-TASK] 🔌 Database service available:`,
+        !!this.dbService
+      );
+      console.log(
+        `[ENHANCED-TASK] 🔍 Looking up task ${payload.taskId} in database`
+      );
+
+      // Retry logic for potential race condition with task creation
+      let task = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (!task && attempts < maxAttempts) {
+        attempts++;
+        console.log(
+          `[ENHANCED-TASK] 🔄 Database lookup attempt ${attempts}/${maxAttempts}`
+        );
+
+        task = await this.dbService.getEnhancedTask(payload.taskId);
+
+        if (!task && attempts < maxAttempts) {
+          console.log(
+            `[ENHANCED-TASK] ⏳ Task not found, waiting 1 second before retry`
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+      }
+
+      if (!task) {
+        console.error(
+          `[ENHANCED-TASK] ❌ Task ${payload.taskId} not found in database after ${maxAttempts} attempts`
+        );
+        throw new Error(`Task ${payload.taskId} not found`);
+      }
+      console.log(
+        `[ENHANCED-TASK] ✅ Found task ${payload.taskId}, current status: ${task.status} (found on attempt ${attempts})`
+      );
+
+      // Update task status to processing
+      console.log(
+        `[ENHANCED-TASK] 📝 Updating task ${payload.taskId} to status: processing`
+      );
+      await this.dbService.updateEnhancedTask(payload.taskId, {
+        status: "processing",
+        progress: 10,
+      });
+      console.log(
+        `[ENHANCED-TASK] ✅ Updated task ${payload.taskId} status to processing`
+      );
+
+      console.log(
+        `[ENHANCED-TASK] 🌍 Creating language sub-tasks for ${
+          payload.data.destinationLanguages.length
+        } languages: ${payload.data.destinationLanguages.join(", ")}`
+      );
+
+      // Create language sub-task webhooks for each destination language
+      for (const language of payload.data.destinationLanguages) {
+        console.log(
+          `[ENHANCED-TASK] 📤 Creating language sub-task webhook for ${language}`
+        );
+        const subTaskEvent: LanguageSubTaskCreatedEvent = {
+          event: "language_subtask.created",
+          taskId: payload.taskId,
+          subTaskId: `${payload.taskId}_${language}`,
+          timestamp: Date.now(),
+          data: {
+            language,
+            status: "pending",
+            parentTaskId: payload.taskId,
+            currentIteration: 0,
+            maxIterations: payload.data.maxReviewIterations,
+            iterations: [],
+          },
+        };
+
+        console.log(
+          `[ENHANCED-TASK] 🌐 Sending language_subtask.created webhook for ${language}`
+        );
+        await this.sendWebhook(subTaskEvent);
+        console.log(
+          `[ENHANCED-TASK] ✅ Sent language_subtask.created webhook for ${language}`
+        );
+      }
+
+      console.log(
+        `[ENHANCED-TASK] 🎉 Completed task.created handling for ${payload.taskId}`
+      );
+    } catch (error) {
       console.error(
-        `[ENHANCED-TASK] ❌ Task ${payload.taskId} not found in database`
+        `[ENHANCED-TASK] ❌ CRITICAL ERROR in handleTaskCreated for ${payload.taskId}:`,
+        error
       );
-      throw new Error(`Task ${payload.taskId} not found`);
+      console.error(
+        `[ENHANCED-TASK] Error stack:`,
+        error instanceof Error ? error.stack : "No stack trace"
+      );
+      console.error(`[ENHANCED-TASK] Error details:`, error);
+      throw error; // Re-throw to maintain error handling behavior
     }
-    console.log(
-      `[ENHANCED-TASK] ✅ Found task ${payload.taskId}, current status: ${task.status}`
-    );
-
-    // Update task status to processing
-    console.log(
-      `[ENHANCED-TASK] 📝 Updating task ${payload.taskId} to status: processing`
-    );
-    await this.dbService.updateEnhancedTask(payload.taskId, {
-      status: "processing",
-      progress: 10,
-    });
-    console.log(
-      `[ENHANCED-TASK] ✅ Updated task ${payload.taskId} status to processing`
-    );
-
-    console.log(
-      `[ENHANCED-TASK] 🌍 Creating language sub-tasks for ${
-        payload.data.destinationLanguages.length
-      } languages: ${payload.data.destinationLanguages.join(", ")}`
-    );
-
-    // Create language sub-task webhooks for each destination language
-    for (const language of payload.data.destinationLanguages) {
-      console.log(
-        `[ENHANCED-TASK] 📤 Creating language sub-task webhook for ${language}`
-      );
-      const subTaskEvent: LanguageSubTaskCreatedEvent = {
-        event: "language_subtask.created",
-        taskId: payload.taskId,
-        subTaskId: `${payload.taskId}_${language}`,
-        timestamp: Date.now(),
-        data: {
-          language,
-          status: "pending",
-          parentTaskId: payload.taskId,
-          currentIteration: 0,
-          maxIterations: payload.data.maxReviewIterations,
-          iterations: [],
-        },
-      };
-
-      console.log(
-        `[ENHANCED-TASK] 🌐 Sending language_subtask.created webhook for ${language}`
-      );
-      await this.sendWebhook(subTaskEvent);
-      console.log(
-        `[ENHANCED-TASK] ✅ Sent language_subtask.created webhook for ${language}`
-      );
-    }
-
-    console.log(
-      `[ENHANCED-TASK] 🎉 Completed task.created handling for ${payload.taskId}`
-    );
   }
 
   async handleLanguageSubTaskCreated(

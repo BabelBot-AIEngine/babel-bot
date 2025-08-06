@@ -38,6 +38,12 @@ export class EnhancedDatabaseService {
     const now = new Date().toISOString();
     const createdAtTimestamp = Date.now();
 
+    console.log(`[ENHANCED-DB] 🎬 Creating enhanced task with ID: ${id}`);
+    console.log(
+      `[ENHANCED-DB] Languages: ${task.destinationLanguages.join(", ")}`
+    );
+    console.log(`[ENHANCED-DB] Initial status: ${task.status}`);
+
     // Initialize language sub-tasks
     const languageSubTasks: { [language: string]: LanguageSubTask } = {};
     for (const language of task.destinationLanguages) {
@@ -77,6 +83,7 @@ export class EnhancedDatabaseService {
     };
 
     // Store in Redis with enhanced schema
+    console.log(`[ENHANCED-DB] 💾 Storing task ${id} in Redis`);
     await this.redis.hset(`enhanced_task:${id}`, {
       id,
       status: enhancedTask.status,
@@ -146,13 +153,23 @@ export class EnhancedDatabaseService {
       });
     }
 
+    console.log(`[ENHANCED-DB] ✅ Successfully created enhanced task ${id}`);
     return id;
   }
 
   async getEnhancedTask(id: string): Promise<EnhancedTranslationTask | null> {
+    console.log(`[ENHANCED-DB] 🔍 Looking up task ${id} in Redis`);
     const taskData = (await this.redis.hgetall(
       `enhanced_task:${id}`
     )) as Record<string, any>;
+
+    console.log(
+      `[ENHANCED-DB] 📋 Raw Redis response for ${id}:`,
+      Object.keys(taskData).length > 0 ? "Found data" : "No data found"
+    );
+    if (Object.keys(taskData).length === 0) {
+      console.log(`[ENHANCED-DB] ⚠️ No task data found for ${id}`);
+    }
 
     if (!taskData || Object.keys(taskData).length === 0) {
       return null;
