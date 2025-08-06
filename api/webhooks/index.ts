@@ -225,30 +225,33 @@ async function handleBabelWebhook(
   }
   console.log("[WEBHOOK-ENDPOINT] ✅ Payload structure validated");
 
-  // Respond immediately after validation
-  console.log("[WEBHOOK-ENDPOINT] 📤 Sending immediate 200 OK response");
-  res.status(200).json({
-    success: true,
-    message: "Webhook received and will be processed",
-  });
+  // Process the webhook BEFORE responding to test logging theory
+  console.log(
+    "[WEBHOOK-ENDPOINT] 🧪 TESTING: Processing webhook BEFORE response"
+  );
 
-  // Process the webhook asynchronously (don't await)
-  console.log("[WEBHOOK-ENDPOINT] 🚀 Starting async webhook processing");
-  BabelWebhookHandler.handleWebhook(body)
-    .then(() => {
-      console.log("Babel webhook processed successfully:", {
-        event: body.event,
-        taskId: body.taskId,
-        retryCount: body._retryCount || 0,
-      });
-    })
-    .catch((error) => {
-      console.error("Babel webhook handler error:", {
-        error: error instanceof Error ? error.message : "Unknown error",
-        taskId: body.taskId,
-        event: body.event,
-      });
-      // Note: We've already responded to the webhook sender, so this error
-      // doesn't affect the webhook delivery status
+  try {
+    await BabelWebhookHandler.handleWebhook(body);
+    console.log(
+      "[WEBHOOK-ENDPOINT] ✅ TESTING: Webhook processing completed successfully"
+    );
+
+    // Respond after processing (for testing)
+    console.log(
+      "[WEBHOOK-ENDPOINT] 📤 Sending 200 OK response AFTER processing"
+    );
+    res.status(200).json({
+      success: true,
+      message: "Webhook processed successfully",
     });
+  } catch (error) {
+    console.error(
+      "[WEBHOOK-ENDPOINT] ❌ TESTING: Webhook processing failed:",
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Webhook processing failed",
+    });
+  }
 }
