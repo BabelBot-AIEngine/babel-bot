@@ -161,7 +161,16 @@ async function handleBabelWebhook(
   console.log("[WEBHOOK-ENDPOINT] Has timestamp:", !!timestamp);
   console.log("[WEBHOOK-ENDPOINT] Has secret:", !!secret);
 
-  if (!secret) {
+  // Local development bypass
+  const isLocalDev =
+    process.env.NODE_ENV === "development" || !process.env.VERCEL;
+  if (isLocalDev) {
+    console.log(
+      "[WEBHOOK-ENDPOINT] 🏠 Local development mode - bypassing webhook authentication"
+    );
+  }
+
+  if (!secret && !isLocalDev) {
     console.error(
       "[WEBHOOK-ENDPOINT] ❌ BABEL_WEBHOOK_SECRET environment variable not configured"
     );
@@ -172,7 +181,7 @@ async function handleBabelWebhook(
     return;
   }
 
-  if (!signature || !timestamp) {
+  if ((!signature || !timestamp) && !isLocalDev) {
     console.error(
       "[WEBHOOK-ENDPOINT] ❌ Missing required Babel webhook headers:",
       {
@@ -187,28 +196,34 @@ async function handleBabelWebhook(
     return;
   }
 
-  // Verify webhook signature
-  console.log("[WEBHOOK-ENDPOINT] 🔐 Verifying webhook signature");
-  const rawBody = JSON.stringify(body);
-  const verification = WebhookVerificationService.verifyBabelWebhook(
-    rawBody,
-    signature,
-    timestamp,
-    secret
-  );
-
-  if (!verification.isValid) {
-    console.error(
-      "[WEBHOOK-ENDPOINT] ❌ Babel webhook verification failed:",
-      verification.error
+  // Verify webhook signature (skip in local development)
+  if (!isLocalDev) {
+    console.log("[WEBHOOK-ENDPOINT] 🔐 Verifying webhook signature");
+    const rawBody = JSON.stringify(body);
+    const verification = WebhookVerificationService.verifyBabelWebhook(
+      rawBody,
+      signature!,
+      timestamp!,
+      secret!
     );
-    res.status(401).json({
-      error: "Unauthorized",
-      message: verification.error || "Invalid signature",
-    });
-    return;
+
+    if (!verification.isValid) {
+      console.error(
+        "[WEBHOOK-ENDPOINT] ❌ Babel webhook verification failed:",
+        verification.error
+      );
+      res.status(401).json({
+        error: "Unauthorized",
+        message: verification.error || "Invalid signature",
+      });
+      return;
+    }
+    console.log("[WEBHOOK-ENDPOINT] ✅ Webhook signature verified");
+  } else {
+    console.log(
+      "[WEBHOOK-ENDPOINT] 🏠 Skipping webhook signature verification (local dev)"
+    );
   }
-  console.log("[WEBHOOK-ENDPOINT] ✅ Webhook signature verified");
 
   // Validate payload structure
   console.log("[WEBHOOK-ENDPOINT] 🔍 Validating payload structure");
@@ -225,33 +240,30 @@ async function handleBabelWebhook(
   }
   console.log("[WEBHOOK-ENDPOINT] ✅ Payload structure validated");
 
-  // Process the webhook BEFORE responding to test logging theory
-  console.log(
-    "[WEBHOOK-ENDPOINT] 🧪 TESTING: Processing webhook BEFORE response"
-  );
+  // Respond immediately to acknowledge receipt
+  console.log("[WEBHOOK-ENDPOINT] 📤 Sending immediate 200 OK response");
+  res.status(200).json({
+    success: true,
+    message: "Webhook received and processing started",
+  });
 
-  try {
-    await BabelWebhookHandler.handleWebhook(body);
-    console.log(
-      "[WEBHOOK-ENDPOINT] ✅ TESTING: Webhook processing completed successfully"
-    );
+  // Process the webhook asynchronously after responding
+  console.log("[WEBHOOK-ENDPOINT] 🚀 Starting async webhook processing");
 
-    // Respond after processing (for testing)
-    console.log(
-      "[WEBHOOK-ENDPOINT] 📤 Sending 200 OK response AFTER processing"
-    );
-    res.status(200).json({
-      success: true,
-      message: "Webhook processed successfully",
-    });
-  } catch (error) {
-    console.error(
-      "[WEBHOOK-ENDPOINT] ❌ TESTING: Webhook processing failed:",
-      error
-    );
-    res.status(500).json({
-      success: false,
-      message: "Webhook processing failed",
-    });
-  }
+  // Use setImmediate to ensure response is sent before processing
+  setImmediate(async () => {
+    try {
+      await BabelWebhookHandler.handleWebhook(body);
+      console.log(
+        "[WEBHOOK-ENDPOINT] ✅ Async webhook processing completed successfully"
+      );
+    } catch (error) {
+      console.error(
+        "[WEBHOOK-ENDPOINT] ❌ Async webhook processing failed:",
+        error
+      );
+      // Don't re-throw - webhook processing failure shouldn't affect response
+      // The graceful degradation we implemented will handle QStash quota issues
+    }
+  });
 }

@@ -135,7 +135,7 @@ export class EnhancedTaskService {
           `[ENHANCED-TASK] 🔄 Database lookup attempt ${attempts}/${maxAttempts}`
         );
 
-        task = await this.dbService.getEnhancedTask(payload.taskId);
+        task = await this.dbService.getEnhancedTask(payload.taskId, true); // Enable verbose logging for webhook debugging
 
         if (!task && attempts < maxAttempts) {
           console.log(

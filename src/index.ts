@@ -45,6 +45,44 @@ app.get("/api", (req, res) => {
   });
 });
 
+// Add webhook routes for local development only
+const isLocalDev =
+  process.env.NODE_ENV === "development" || !process.env.VERCEL;
+if (isLocalDev) {
+  console.log("[LOCAL-DEV] 🏠 Setting up local webhook endpoint");
+  app.post("/api/webhooks", express.json(), async (req, res) => {
+    console.log("[LOCAL-WEBHOOK] 📨 Received webhook locally");
+    console.log("[LOCAL-WEBHOOK] Body:", JSON.stringify(req.body, null, 2));
+
+    try {
+      // Import the webhook handler service directly
+      const { BabelWebhookHandler } = await import(
+        "./services/babelWebhookHandler"
+      );
+
+      // Process the webhook using the handler
+      await BabelWebhookHandler.handleWebhook(req.body);
+
+      console.log("[LOCAL-WEBHOOK] ✅ Webhook processed successfully");
+      res.status(200).json({
+        success: true,
+        message: "Webhook processed successfully",
+      });
+    } catch (error) {
+      console.error("[LOCAL-WEBHOOK] ❌ Webhook processing failed:", error);
+      res.status(500).json({
+        success: false,
+        message: "Webhook processing failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+} else {
+  console.log(
+    "[PRODUCTION] 🚀 Skipping local webhook setup (using Vercel functions)"
+  );
+}
+
 // Apply authentication middleware to all API routes
 app.use("/api", requireAuth, translationRoutes);
 
