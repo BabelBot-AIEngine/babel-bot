@@ -93,8 +93,11 @@ export class WebhookSender {
     // Add Vercel deployment protection bypass header if available
     const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
     if (bypassSecret) {
+      console.log("Bypassing Vercel protection with secret:", bypassSecret);
       headers["x-vercel-protection-bypass"] = bypassSecret;
     }
+
+    console.log("Headers:", headers);
 
     try {
       const response = await fetch(url, {
