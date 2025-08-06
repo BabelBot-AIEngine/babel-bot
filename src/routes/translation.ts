@@ -14,7 +14,10 @@ import {
   LanguageTaskStatus,
   GuideType,
 } from "../types";
-import { EnhancedTranslationTask, TaskStatus as EnhancedTaskStatus } from "../types/enhanced-task";
+import {
+  EnhancedTranslationTask,
+  TaskStatus as EnhancedTaskStatus,
+} from "../types/enhanced-task";
 
 const router = Router();
 const taskService = new TaskService();
@@ -23,152 +26,29 @@ const translationService = new TranslationService();
 const filterService = new FilterService();
 
 // Feature flag for enhanced processing (default: true for new installations)
-const USE_ENHANCED_PROCESSING = process.env.USE_ENHANCED_PROCESSING !== 'false';
+const USE_ENHANCED_PROCESSING = process.env.USE_ENHANCED_PROCESSING !== "false";
 
-// Helper functions for enhanced-to-legacy task transformation
-const mapEnhancedStatusToLegacy = (enhancedStatus: EnhancedTaskStatus): TranslationTask['status'] => {
+// Helper function for status filtering (enhanced to legacy mapping)
+const mapEnhancedStatusToLegacy = (
+  enhancedStatus: EnhancedTaskStatus
+): TranslationTask["status"] => {
   switch (enhancedStatus) {
-    case 'pending':
-      return 'pending';
-    case 'processing':
-      return 'translating';
-    case 'review_pending':
-    case 'review_active':
-      return 'human_review';
-    case 'finalizing':
-      return 'translating'; // Still processing
-    case 'completed':
-      return 'done';
-    case 'failed':
-      return 'failed';
+    case "pending":
+      return "pending";
+    case "processing":
+      return "translating";
+    case "review_pending":
+    case "review_active":
+      return "human_review";
+    case "finalizing":
+      return "translating"; // Still processing
+    case "completed":
+      return "done";
+    case "failed":
+      return "failed";
     default:
-      return 'pending';
+      return "pending";
   }
-};
-
-const createEnhancedResult = (enhancedTask: EnhancedTranslationTask): TranslationResponse | undefined => {
-  if (!enhancedTask.languageSubTasks || Object.keys(enhancedTask.languageSubTasks).length === 0) {
-    return undefined;
-  }
-
-  const translations: TranslationResult[] = [];
-  
-  Object.entries(enhancedTask.languageSubTasks).forEach(([language, subTask]) => {
-    if (subTask.translatedText) {
-      // Get the latest iteration's scores
-      const latestIteration = subTask.iterations[subTask.iterations.length - 1];
-      const complianceScore = latestIteration?.combinedScore || 
-                              latestIteration?.llmVerification?.score || 
-                              undefined;
-      
-      // Map enhanced status to legacy status
-      let legacyStatus: LanguageTaskStatus;
-      switch (subTask.status) {
-        case 'pending':
-        case 'translating':
-          legacyStatus = 'translating';
-          break;
-        case 'translation_complete':
-        case 'llm_verifying':
-        case 'llm_verified':
-          legacyStatus = 'llm_verification';
-          break;
-        case 'review_ready':
-        case 'review_queued':
-        case 'review_active':
-        case 'review_complete':
-        case 'llm_reverifying':
-          legacyStatus = 'human_review';
-          break;
-        case 'iteration_complete':
-        case 'finalized':
-          legacyStatus = 'done';
-          break;
-        case 'failed':
-          legacyStatus = 'failed';
-          break;
-        default:
-          legacyStatus = 'pending';
-      }
-      
-      // Find associated Prolific study info
-      const prolificStudyId = Object.keys(enhancedTask.prolificStudyMappings)
-        .find(studyId => enhancedTask.prolificStudyMappings[studyId].languages.includes(language));
-      const batchId = prolificStudyId ? enhancedTask.prolificStudyMappings[prolificStudyId].batchId : undefined;
-      
-      translations.push({
-        language,
-        translatedText: subTask.translatedText,
-        reviewNotes: latestIteration?.humanReview?.feedback ? [latestIteration.humanReview.feedback] : undefined,
-        complianceScore,
-        status: legacyStatus,
-        batchId,
-        studyId: prolificStudyId,
-      });
-    }
-  });
-  
-  if (translations.length === 0) {
-    return undefined;
-  }
-  
-  return {
-    originalArticle: enhancedTask.mediaArticle,
-    translations,
-    processedAt: enhancedTask.updatedAt,
-  };
-};
-
-const calculateEnhancedProgress = (enhancedTask: EnhancedTranslationTask): number => {
-  if (!enhancedTask.languageSubTasks || Object.keys(enhancedTask.languageSubTasks).length === 0) {
-    return 0;
-  }
-  
-  const totalLanguages = Object.keys(enhancedTask.languageSubTasks).length;
-  let totalProgress = 0;
-  
-  Object.values(enhancedTask.languageSubTasks).forEach(subTask => {
-    // Calculate progress based on status
-    switch (subTask.status) {
-      case 'pending':
-        totalProgress += 0;
-        break;
-      case 'translating':
-        totalProgress += 0.2;
-        break;
-      case 'translation_complete':
-        totalProgress += 0.4;
-        break;
-      case 'llm_verifying':
-      case 'llm_verified':
-        totalProgress += 0.5;
-        break;
-      case 'review_ready':
-      case 'review_queued':
-        totalProgress += 0.6;
-        break;
-      case 'review_active':
-        totalProgress += 0.7;
-        break;
-      case 'review_complete':
-      case 'llm_reverifying':
-        totalProgress += 0.8;
-        break;
-      case 'iteration_complete':
-        totalProgress += 0.9;
-        break;
-      case 'finalized':
-        totalProgress += 1.0;
-        break;
-      case 'failed':
-        totalProgress += 0; // Don't count failed tasks
-        break;
-      default:
-        totalProgress += 0;
-    }
-  });
-  
-  return Math.round((totalProgress / totalLanguages) * 100);
 };
 
 router.post("/translate", async (req: Request, res: Response) => {
@@ -204,10 +84,13 @@ router.post("/translate", async (req: Request, res: Response) => {
     let taskId: string;
     let processingType: string;
     let pollUrl: string;
-    
+
     // Use parameter from request, fallback to environment variable, default to enhanced
-    const shouldUseEnhanced = useEnhancedProcessing !== undefined ? useEnhancedProcessing : USE_ENHANCED_PROCESSING;
-    
+    const shouldUseEnhanced =
+      useEnhancedProcessing !== undefined
+        ? useEnhancedProcessing
+        : USE_ENHANCED_PROCESSING;
+
     if (shouldUseEnhanced) {
       // Use enhanced webhook-driven processing
       taskId = await enhancedTaskService.createTranslationTask(
@@ -216,8 +99,8 @@ router.post("/translate", async (req: Request, res: Response) => {
         destinationLanguages,
         guide,
         useFullMarkdown,
-        3,   // maxReviewIterations - default
-        4.5  // confidenceThreshold - default
+        3, // maxReviewIterations - default
+        4.5 // confidenceThreshold - default
       );
       processingType = "enhanced";
       pollUrl = `/api/tasks/${taskId}`;
@@ -239,12 +122,14 @@ router.post("/translate", async (req: Request, res: Response) => {
       message: `Translation task created successfully (${processingType} processing)`,
       pollUrl,
       processingType,
-      enhancedFeatures: shouldUseEnhanced ? {
-        concurrentLanguages: true,
-        iterativeReview: true,
-        maxIterations: 3,
-        confidenceThreshold: 4.5
-      } : undefined
+      enhancedFeatures: shouldUseEnhanced
+        ? {
+            concurrentLanguages: true,
+            iterativeReview: true,
+            maxIterations: 3,
+            confidenceThreshold: 4.5,
+          }
+        : undefined,
     });
   } catch (error) {
     console.error("Translation error:", error);
@@ -280,47 +165,25 @@ router.get("/health", (req: Request, res: Response) => {
 router.get("/tasks/:taskId", async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
-    
+
     // Try enhanced task first, then fallback to legacy
-    let enhancedTask = await enhancedTaskService.getTask(taskId);
-    let legacyTask: TranslationTask | null = null;
-    let isEnhanced = true;
-    
-    if (!enhancedTask) {
-      legacyTask = await taskService.getTask(taskId);
-      isEnhanced = false;
+    const enhancedTask = await enhancedTaskService.getTask(taskId);
+    if (enhancedTask) {
+      const taskWithType = { ...enhancedTask, type: "enhanced" as const };
+      res.json({ task: taskWithType });
+      return;
     }
 
-    if (!enhancedTask && !legacyTask) {
-      return res.status(404).json({
-        error: "Task not found",
-      });
+    const legacyTask = await taskService.getTask(taskId);
+    if (legacyTask) {
+      const taskWithType = { ...legacyTask, type: "legacy" as const };
+      res.json({ task: taskWithType });
+      return;
     }
 
-    // Transform enhanced task to legacy format for UI compatibility
-    if (isEnhanced && enhancedTask) {
-      const legacyCompatibleTask: TranslationTask = {
-        id: enhancedTask.id,
-        status: mapEnhancedStatusToLegacy(enhancedTask.status),
-        mediaArticle: enhancedTask.mediaArticle,
-        editorialGuidelines: enhancedTask.editorialGuidelines,
-        destinationLanguages: enhancedTask.destinationLanguages,
-        result: enhancedTask.result || createEnhancedResult(enhancedTask),
-        error: enhancedTask.error,
-        createdAt: enhancedTask.createdAt,
-        updatedAt: enhancedTask.updatedAt,
-        progress: calculateEnhancedProgress(enhancedTask),
-        guide: enhancedTask.guide as GuideType | undefined,
-        humanReviewBatches: enhancedTask.humanReviewBatches || [],
-        useFullMarkdown: enhancedTask.useFullMarkdown,
-      };
-      
-      const response: TaskStatusResponse = { task: legacyCompatibleTask };
-      res.json(response);
-    } else if (legacyTask) {
-      const response: TaskStatusResponse = { task: legacyTask };
-      res.json(response);
-    }
+    res.status(404).json({
+      error: "Task not found",
+    });
   } catch (error) {
     console.error("Error fetching task:", error);
     res.status(500).json({
@@ -336,41 +199,47 @@ router.get("/tasks", async (req: Request, res: Response) => {
     // Get both enhanced and legacy tasks
     let legacyTasks: TranslationTask[] = [];
     let enhancedTasks: EnhancedTranslationTask[] = [];
-    
+
     if (status && typeof status === "string") {
       legacyTasks = await taskService.getTasksByStatus(status as any);
-      // Get enhanced tasks and filter by equivalent status
-      const allEnhancedTasks = await enhancedTaskService.getAllTasks();
-      enhancedTasks = allEnhancedTasks.filter(task => 
-        mapEnhancedStatusToLegacy(task.status) === status
-      );
+      // For enhanced tasks, we'll need to filter after adding type info since status mapping is complex
+      enhancedTasks = await enhancedTaskService.getAllTasks();
     } else {
       legacyTasks = await taskService.getAllTasks();
       enhancedTasks = await enhancedTaskService.getAllTasks();
     }
 
-    // Convert enhanced tasks to legacy format
-    const convertedEnhancedTasks: TranslationTask[] = enhancedTasks.map(enhancedTask => ({
-      id: enhancedTask.id,
-      status: mapEnhancedStatusToLegacy(enhancedTask.status),
-      mediaArticle: enhancedTask.mediaArticle,
-      editorialGuidelines: enhancedTask.editorialGuidelines,
-      destinationLanguages: enhancedTask.destinationLanguages,
-      result: enhancedTask.result || createEnhancedResult(enhancedTask),
-      error: enhancedTask.error,
-      createdAt: enhancedTask.createdAt,
-      updatedAt: enhancedTask.updatedAt,
-      progress: calculateEnhancedProgress(enhancedTask),
-      guide: enhancedTask.guide as GuideType | undefined,
-      humanReviewBatches: enhancedTask.humanReviewBatches || [],
-      useFullMarkdown: enhancedTask.useFullMarkdown,
+    // Add type property to each task
+    const legacyTasksWithType = legacyTasks.map((task) => ({
+      ...task,
+      type: "legacy" as const,
+    }));
+    const enhancedTasksWithType = enhancedTasks.map((task) => ({
+      ...task,
+      type: "enhanced" as const,
     }));
 
     // Combine and sort by creation date (newest first)
-    const allTasks = [...legacyTasks, ...convertedEnhancedTasks]
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const allTasks = [...legacyTasksWithType, ...enhancedTasksWithType].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
-    const response: TaskListResponse = { tasks: allTasks };
+    // Filter by status if requested (after combining since enhanced/legacy have different status systems)
+    let filteredTasks = allTasks;
+    if (status && typeof status === "string") {
+      filteredTasks = allTasks.filter((task) => {
+        if (task.type === "legacy") {
+          return task.status === status;
+        } else {
+          // For enhanced tasks, map their status to legacy equivalent for filtering
+          return mapEnhancedStatusToLegacy(task.status) === status;
+        }
+      });
+    }
+
+    // Cast to any to handle mixed task types
+    const response = { tasks: filteredTasks };
     res.json(response);
   } catch (error) {
     console.error("Error fetching tasks:", error);
