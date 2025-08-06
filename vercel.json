@@ -5,6 +5,9 @@
     },
     "api/webhooks/index.ts": {
       "maxDuration": 30
+    },
+    "api/tasks/enhanced/[taskId]/retrigger-webhook.ts": {
+      "maxDuration": 30
     }
   },
   "outputDirectory": "dist/client",
@@ -12,6 +15,10 @@
     {
       "source": "/api/webhooks",
       "destination": "/api/webhooks/index.ts"
+    },
+    {
+      "source": "/api/tasks/enhanced/([^/]+)/retrigger-webhook",
+      "destination": "/api/tasks/enhanced/[taskId]/retrigger-webhook.ts"
     },
     {
       "source": "/api/(.*)",
