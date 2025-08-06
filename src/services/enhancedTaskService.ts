@@ -702,6 +702,35 @@ export class EnhancedTaskService {
         });
       }
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+
+      // Check if this is a QStash quota issue
+      if (
+        errorMessage.includes("quota") ||
+        errorMessage.includes("maxRetries exceeded")
+      ) {
+        console.warn(
+          `[ENHANCED-WEBHOOK] ⚠️ QStash quota exhausted for ${event.event}:${event.taskId}. ` +
+            "Webhook delivery skipped but processing continues."
+        );
+
+        // Track as failed but with specific quota exhaustion context
+        if (event.taskId) {
+          await this.dbService.addWebhookAttempt(event.taskId, {
+            eventType: event.event,
+            url: this.webhookUrl,
+            attempt: 1,
+            status: "failed",
+            createdAt: new Date().toISOString(),
+            lastAttemptAt: new Date().toISOString(),
+          });
+        }
+
+        // Don't throw - allow processing to continue
+        return;
+      }
+
       console.error(
         `[ENHANCED-WEBHOOK] ❌ Failed to send webhook for event ${event.event}:`,
         error
@@ -721,7 +750,8 @@ export class EnhancedTaskService {
         });
       }
 
-      // Re-throw to maintain error handling behavior
+      // For non-quota errors, still throw to maintain error visibility
+      // but consider if we want to be more permissive here
       throw error;
     }
   }

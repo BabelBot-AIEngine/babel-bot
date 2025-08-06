@@ -39,6 +39,7 @@ export interface WebhookDeliveryOptions {
   maxRetries?: number;
   backoffDelays?: number[];
   timeout?: number;
+  skipQStashFallback?: boolean; // Skip QStash fallback for non-critical events
 }
 
 export interface QStashWebhookPayload extends BabelWebhookPayload {

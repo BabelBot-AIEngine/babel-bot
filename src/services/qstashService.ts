@@ -11,6 +11,15 @@ export class QStashService {
       if (!token) {
         throw new Error("QSTASH_TOKEN environment variable is required");
       }
+
+      console.log("[QSTASH-SERVICE] 🔧 Initializing QStash client");
+      console.log("[QSTASH-SERVICE] Token present:", !!token);
+      console.log("[QSTASH-SERVICE] Token length:", token?.length || 0);
+      console.log(
+        "[QSTASH-SERVICE] Token prefix:",
+        token?.substring(0, 8) + "..."
+      );
+
       this.qstash = new Client({ token });
     }
     return this.qstash;
@@ -75,10 +84,23 @@ export class QStashService {
     } catch (error) {
       console.error("Failed to schedule QStash webhook:", {
         error: error instanceof Error ? error.message : "Unknown error",
+        errorName: error instanceof Error ? error.name : "Unknown",
+        errorCode: (error as any)?.status || (error as any)?.code,
         event: payload.event,
         taskId: payload.taskId,
         url,
       });
+
+      // Add specific diagnostics for quota errors
+      if (error instanceof Error && error.message.includes("quota")) {
+        console.error("[QSTASH-SERVICE] 💸 Quota-related error detected:");
+        console.error("[QSTASH-SERVICE] This may indicate:");
+        console.error("[QSTASH-SERVICE] 1. Invalid or expired QStash token");
+        console.error("[QSTASH-SERVICE] 2. QStash account limits reached");
+        console.error("[QSTASH-SERVICE] 3. Free tier restrictions");
+        console.error("[QSTASH-SERVICE] 4. Authentication failure");
+      }
+
       throw error;
     }
   }

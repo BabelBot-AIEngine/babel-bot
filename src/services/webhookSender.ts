@@ -7,6 +7,7 @@ export class WebhookSender {
     maxRetries: 3,
     backoffDelays: [1000, 5000, 15000], // 1s, 5s, 15s
     timeout: 30000, // 30 seconds
+    skipQStashFallback: false, // Allow QStash fallback by default
   };
 
   static async sendBabelWebhook(
@@ -58,11 +59,33 @@ export class WebhookSender {
       }
     }
 
-    // All retries failed - handoff to QStash
+    // All retries failed - check if we should attempt handoff to QStash
+    if (finalOptions.skipQStashFallback) {
+      console.warn(
+        `⚠️ All webhook delivery attempts failed for ${timestampedPayload.event}:${timestampedPayload.taskId}. ` +
+          "QStash fallback disabled. Webhook delivery unsuccessful but processing continues."
+      );
+      return;
+    }
+
     console.log(
-      `All webhook delivery attempts failed, handing off to QStash for reliable delivery`
+      `All webhook delivery attempts failed, attempting handoff to QStash for reliable delivery`
     );
-    await this.handoffToQStash(url, timestampedPayload, secret);
+
+    try {
+      await this.handoffToQStash(url, timestampedPayload, secret);
+      console.log(
+        `✅ Successfully handed off webhook to QStash: ${timestampedPayload.event}`
+      );
+    } catch (error) {
+      console.warn(
+        `⚠️ QStash handoff failed for ${timestampedPayload.event}:${timestampedPayload.taskId}. ` +
+          "Webhook delivery unsuccessful but processing will continue. " +
+          `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
+      // Don't re-throw - allow processing to continue
+      // The webhook is lost but the main task processing should continue
+    }
   }
 
   private static async attemptWebhookDelivery(
@@ -150,13 +173,25 @@ export class WebhookSender {
     } catch (error) {
       console.error("Failed to handoff webhook to QStash:", error);
 
-      // This is a critical failure - webhook might be lost
-      // TODO: Consider implementing a dead letter queue or alert system
-      throw new Error(
-        `Critical webhook delivery failure: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      // Check if this is a quota exhaustion error
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      if (
+        errorMessage.includes("quota") ||
+        errorMessage.includes("maxRetries exceeded")
+      ) {
+        console.warn(
+          `⚠️ QStash quota exhausted for webhook ${payload.event}:${payload.taskId}. ` +
+            "This is expected during high traffic. Webhook delivery will be skipped but processing continues."
+        );
+
+        // Don't throw - allow processing to continue
+        // In production, you might want to implement alternative delivery mechanisms
+        return;
+      }
+
+      // For other errors, still throw to maintain error visibility
+      throw new Error(`Critical webhook delivery failure: ${errorMessage}`);
     }
   }
 

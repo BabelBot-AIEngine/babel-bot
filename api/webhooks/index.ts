@@ -1,4 +1,5 @@
 import { VercelRequest, VercelResponse } from "@vercel/node";
+import { waitUntil } from "@vercel/functions";
 import { WebhookVerificationService } from "../../src/services/webhookVerification";
 import { ProlificWebhookHandler } from "../../src/services/prolificWebhookHandler";
 import { BabelWebhookHandler } from "../../src/services/babelWebhookHandler";
@@ -123,23 +124,26 @@ async function handleProlificWebhook(
     message: "Webhook received and will be processed",
   });
 
-  // Process the webhook asynchronously (don't await)
-  ProlificWebhookHandler.handleWebhook(body)
-    .then(() => {
-      console.log("Prolific webhook processed successfully:", {
-        event: body.event_type,
-        studyId: body.study?.id,
-        status: body.study?.status,
-      });
-    })
-    .catch((error) => {
-      console.error("Prolific webhook handler error:", {
-        error: error instanceof Error ? error.message : "Unknown error",
-        studyId: body.study?.id,
-      });
-      // Note: We've already responded to the webhook sender, so this error
-      // doesn't affect the webhook delivery status
-    });
+  // Process the webhook asynchronously using waitUntil
+  waitUntil(
+    (async () => {
+      try {
+        await ProlificWebhookHandler.handleWebhook(body);
+        console.log("Prolific webhook processed successfully:", {
+          event: body.event_type,
+          studyId: body.study?.id,
+          status: body.study?.status,
+        });
+      } catch (error) {
+        console.error("Prolific webhook handler error:", {
+          error: error instanceof Error ? error.message : "Unknown error",
+          studyId: body.study?.id,
+        });
+        // Note: We've already responded to the webhook sender, so this error
+        // doesn't affect the webhook delivery status
+      }
+    })()
+  );
 }
 
 async function handleBabelWebhook(
@@ -247,23 +251,26 @@ async function handleBabelWebhook(
     message: "Webhook received and processing started",
   });
 
-  // Process the webhook asynchronously after responding
-  console.log("[WEBHOOK-ENDPOINT] 🚀 Starting async webhook processing");
+  // Process the webhook asynchronously after responding using waitUntil
+  console.log(
+    "[WEBHOOK-ENDPOINT] 🚀 Starting async webhook processing with waitUntil"
+  );
 
-  // Use setImmediate to ensure response is sent before processing
-  setImmediate(async () => {
-    try {
-      await BabelWebhookHandler.handleWebhook(body);
-      console.log(
-        "[WEBHOOK-ENDPOINT] ✅ Async webhook processing completed successfully"
-      );
-    } catch (error) {
-      console.error(
-        "[WEBHOOK-ENDPOINT] ❌ Async webhook processing failed:",
-        error
-      );
-      // Don't re-throw - webhook processing failure shouldn't affect response
-      // The graceful degradation we implemented will handle QStash quota issues
-    }
-  });
+  waitUntil(
+    (async () => {
+      try {
+        await BabelWebhookHandler.handleWebhook(body);
+        console.log(
+          "[WEBHOOK-ENDPOINT] ✅ Async webhook processing completed successfully"
+        );
+      } catch (error) {
+        console.error(
+          "[WEBHOOK-ENDPOINT] ❌ Async webhook processing failed:",
+          error
+        );
+        // Don't re-throw - webhook processing failure shouldn't affect response
+        // The graceful degradation we implemented will handle QStash quota issues
+      }
+    })()
+  );
 }
