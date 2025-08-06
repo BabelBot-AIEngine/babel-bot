@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import {
   Dialog,
   DialogContent,
@@ -89,6 +90,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   open,
   onClose,
 }) => {
+  const { getToken } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [retriggerCooldown, setRetriggerCooldown] = useState(0);
 
@@ -178,11 +180,20 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
     if (!isEnhancedTask(task)) return;
 
     try {
+      const token = await getToken();
+      if (!token) {
+        console.error("No authentication token available");
+        return;
+      }
+
       const response = await fetch(
         `/api/tasks/enhanced/${task.id}/retrigger-webhook`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
       );
 
@@ -198,8 +209,11 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
             return prev - 1;
           });
         }, 1000);
+      } else if (response.status === 401 || response.status === 403) {
+        console.error("Authentication/authorization error:", response.status);
+        // Could show a toast notification here
       } else {
-        console.error("Failed to retrigger webhook");
+        console.error("Failed to retrigger webhook:", response.status);
       }
     } catch (error) {
       console.error("Error retriggering webhook:", error);
