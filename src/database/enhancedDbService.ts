@@ -159,9 +159,36 @@ export class EnhancedDatabaseService {
 
   async getEnhancedTask(id: string): Promise<EnhancedTranslationTask | null> {
     console.log(`[ENHANCED-DB] 🔍 Looking up task ${id} in Redis`);
-    const taskData = (await this.redis.hgetall(
-      `enhanced_task:${id}`
-    )) as Record<string, any>;
+    console.log(
+      `[ENHANCED-DB] 🔗 Redis client status:`,
+      this.redis ? "Connected" : "Not connected"
+    );
+
+    let taskData: Record<string, any>;
+    try {
+      console.log(
+        `[ENHANCED-DB] 📡 Starting Redis hgetall for enhanced_task:${id}`
+      );
+
+      // Add timeout protection
+      const redisPromise = this.redis.hgetall(`enhanced_task:${id}`);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("Redis timeout after 10 seconds")),
+          10000
+        )
+      );
+
+      taskData = (await Promise.race([redisPromise, timeoutPromise])) as Record<
+        string,
+        any
+      >;
+      console.log(`[ENHANCED-DB] ✅ Redis hgetall completed successfully`);
+    } catch (error) {
+      console.error(`[ENHANCED-DB] ❌ Redis hgetall failed for ${id}:`, error);
+      console.error(`[ENHANCED-DB] Redis error details:`, error);
+      throw error;
+    }
 
     console.log(
       `[ENHANCED-DB] 📋 Raw Redis response for ${id}:`,
