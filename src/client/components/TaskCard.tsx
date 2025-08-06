@@ -34,6 +34,36 @@ const isEnhancedTask = (task: TranslationTask): boolean => {
   return (task as any).type === "enhanced";
 };
 
+// Helper to get available translations from any task type
+const getAvailableTranslations = (task: TranslationTask): any[] => {
+  // For legacy tasks, return translations from result if available
+  if (!isEnhancedTask(task)) {
+    return task.result?.translations || [];
+  }
+
+  // For enhanced tasks, construct translations from languageSubTasks
+  const enhancedTask = task as any;
+  const translations: any[] = [];
+
+  if (enhancedTask.languageSubTasks) {
+    Object.entries(enhancedTask.languageSubTasks).forEach(
+      ([language, subTask]: [string, any]) => {
+        // Only show translations that have been translated (not just pending)
+        if (subTask.translatedText) {
+          translations.push({
+            language,
+            translatedText: subTask.translatedText,
+            status: subTask.status,
+            complianceScore: subTask.complianceScore,
+          });
+        }
+      }
+    );
+  }
+
+  return translations;
+};
+
 // Helper functions (moved outside component to avoid hoisting issues)
 const mapEnhancedStatusToLegacy = (
   enhancedStatus: string
@@ -119,14 +149,56 @@ const TaskCard: React.FC<TaskCardProps> = ({
   currentColumnStatus,
 }) => {
   // Handle different task types
-  const displayStatus =
+  const displayStatus = currentColumnStatus || task.status;
+
+  // For enhanced tasks, get the most representative status from language sub-tasks
+  const getEnhancedDisplayStatus = (): LanguageTaskStatus => {
+    const enhancedTask = task as any;
+    if (
+      !enhancedTask.languageSubTasks ||
+      Object.keys(enhancedTask.languageSubTasks).length === 0
+    ) {
+      return mapEnhancedStatusToLegacy(enhancedTask.status);
+    }
+
+    // Get statuses of languages that are displayed (filtered languages or all)
+    const relevantLanguages =
+      filteredLanguages || enhancedTask.destinationLanguages;
+    const languageStatuses = relevantLanguages.map((lang) => {
+      const subTask = enhancedTask.languageSubTasks[lang];
+      return subTask ? mapSubTaskStatusToLegacy(subTask.status) : "pending";
+    });
+
+    // If all languages have the same status, use that
+    const uniqueStatuses = [...new Set(languageStatuses)];
+    if (uniqueStatuses.length === 1) {
+      return uniqueStatuses[0] as LanguageTaskStatus;
+    }
+
+    // If mixed statuses, prioritize the most advanced status
+    const statusPriority: LanguageTaskStatus[] = [
+      "failed",
+      "done",
+      "human_review",
+      "llm_verification",
+      "translating",
+      "pending",
+    ];
+    for (const status of statusPriority) {
+      if (languageStatuses.includes(status)) {
+        return status;
+      }
+    }
+
+    return "pending";
+  };
+
+  const finalDisplayStatus =
     currentColumnStatus ||
-    (isEnhancedTask(task)
-      ? mapEnhancedStatusToLegacy((task as any).status)
-      : task.status);
+    (isEnhancedTask(task) ? getEnhancedDisplayStatus() : task.status);
 
   const getStatusIcon = () => {
-    switch (displayStatus) {
+    switch (finalDisplayStatus) {
       case "failed":
         return <ErrorIcon color="error" fontSize="small" />;
       case "translating":
@@ -227,7 +299,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
   };
 
   const getStatusGradient = () => {
-    switch (displayStatus) {
+    switch (finalDisplayStatus) {
       case "pending":
         return "linear-gradient(135deg, #ef4444 0%, #f87171 100%)";
       case "translating":
@@ -366,14 +438,14 @@ const TaskCard: React.FC<TaskCardProps> = ({
           {task.mediaArticle.title ||
             task.mediaArticle.text.substring(0, 60) + "..."}
         </Typography>
-        {task.result && isPartialDisplay && (
+        {getAvailableTranslations(task).length > 0 && isPartialDisplay && (
           <Box sx={{ mt: 1 }}>
             <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-              <strong>Languages in {displayStatus}:</strong>{" "}
+              <strong>Languages in {finalDisplayStatus}:</strong>{" "}
               {displayLanguages.length}
             </Typography>
             <Box sx={{ mt: 1 }}>
-              {task.result.translations
+              {getAvailableTranslations(task)
                 .filter((translation) =>
                   displayLanguages.includes(translation.language)
                 )
@@ -392,14 +464,14 @@ const TaskCard: React.FC<TaskCardProps> = ({
                         {getLanguageDisplayName(translation.language)}:
                       </strong>
                       <Chip
-                        label={translation.status || displayStatus}
+                        label={translation.status || finalDisplayStatus}
                         size="small"
                         sx={{
                           ml: 1,
                           height: 16,
                           fontSize: "0.6rem",
                           backgroundColor: getLanguageStatusColor(
-                            translation.status || displayStatus
+                            translation.status || finalDisplayStatus
                           ),
                           color: "white",
                         }}
@@ -418,17 +490,18 @@ const TaskCard: React.FC<TaskCardProps> = ({
             </Box>
           </Box>
         )}
-        {task.result && !isPartialDisplay && (
+        {getAvailableTranslations(task).length > 0 && !isPartialDisplay && (
           <Box sx={{ mt: 1 }}>
             <Typography variant="caption" sx={{ display: "block", mb: 1 }}>
-              <strong>Translations:</strong> {task.result.translations.length}
+              <strong>Translations:</strong>{" "}
+              {getAvailableTranslations(task).length}
             </Typography>
           </Box>
         )}
 
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mb: 1 }}>
           {displayLanguages.slice(0, 3).map((lang) => {
-            const langStatus = languageStates.get(lang) || displayStatus;
+            const langStatus = languageStates.get(lang) || finalDisplayStatus;
             const statusColor = getLanguageStatusColor(langStatus);
             return (
               <Chip
@@ -464,9 +537,9 @@ const TaskCard: React.FC<TaskCardProps> = ({
           )}
         </Box>
 
-        {(displayStatus === "translating" ||
-          displayStatus === "llm_verification" ||
-          displayStatus === "human_review") && (
+        {(finalDisplayStatus === "translating" ||
+          finalDisplayStatus === "llm_verification" ||
+          finalDisplayStatus === "human_review") && (
           <Box sx={{ mb: 2 }}>
             <Box
               sx={{

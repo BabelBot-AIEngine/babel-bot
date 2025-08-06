@@ -75,9 +75,20 @@ export class TaskService {
           task.useFullMarkdown
         );
 
+      // Update with partial result containing translations (without verification)
+      const partialResult: TranslationResponse = {
+        originalArticle: task.mediaArticle,
+        translations: translations.map((translation) => ({
+          ...translation,
+          status: "translating", // Mark as still translating since not verified yet
+        })),
+        processedAt: new Date().toISOString(),
+      };
+
       await this.dbService.updateTask(taskId, {
         status: "llm_verification",
         progress: 60,
+        result: partialResult,
       });
 
       await this.sleep(1500);
@@ -252,7 +263,10 @@ export class TaskService {
           );
 
           // Setup batch and wait for it to be ready before creating study
-          await this.prolificService.setupAndWaitForBatch(batch.id, batch.dataset_id);
+          await this.prolificService.setupAndWaitForBatch(
+            batch.id,
+            batch.dataset_id
+          );
 
           console.log(`Creating study in workspace: ${config.workspaceId}`);
 
@@ -272,18 +286,22 @@ export class TaskService {
           });
 
           // Get comprehensive study filters (participant groups + language fluency)
-          const studyFilters = await this.prolificService.getStudyFilters([translation.language]);
+          const studyFilters = await this.prolificService.getStudyFilters([
+            translation.language,
+          ]);
           if (studyFilters.length > 0) {
             console.log(
-              `Using study filters: ${studyFilters.map(f => {
-                if (f.selected_values) {
-                  return `${f.filter_id}=[${f.selected_values.join(', ')}]`;
-                } else if (f.selected_range) {
-                  return `${f.filter_id}=[${f.selected_range.lower}-${f.selected_range.upper}]`;
-                } else {
-                  return `${f.filter_id}=[unknown format]`;
-                }
-              }).join('; ')}`
+              `Using study filters: ${studyFilters
+                .map((f) => {
+                  if (f.selected_values) {
+                    return `${f.filter_id}=[${f.selected_values.join(", ")}]`;
+                  } else if (f.selected_range) {
+                    return `${f.filter_id}=[${f.selected_range.lower}-${f.selected_range.upper}]`;
+                  } else {
+                    return `${f.filter_id}=[unknown format]`;
+                  }
+                })
+                .join("; ")}`
             );
           }
 

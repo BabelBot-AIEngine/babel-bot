@@ -85,6 +85,36 @@ const isEnhancedTask = (task: TranslationTask): boolean => {
   return (task as any).type === "enhanced";
 };
 
+// Helper to get available translations from any task type
+const getAvailableTranslations = (task: TranslationTask): any[] => {
+  // For legacy tasks, return translations from result if available
+  if (!isEnhancedTask(task)) {
+    return task.result?.translations || [];
+  }
+
+  // For enhanced tasks, construct translations from languageSubTasks
+  const enhancedTask = task as any;
+  const translations: any[] = [];
+
+  if (enhancedTask.languageSubTasks) {
+    Object.entries(enhancedTask.languageSubTasks).forEach(
+      ([language, subTask]: [string, any]) => {
+        // Only show translations that have been translated (not just pending)
+        if (subTask.translatedText) {
+          translations.push({
+            language,
+            translatedText: subTask.translatedText,
+            status: subTask.status,
+            complianceScore: subTask.complianceScore,
+          });
+        }
+      }
+    );
+  }
+
+  return translations;
+};
+
 const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
   task,
   open,
@@ -1007,7 +1037,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
         </TabPanel>
 
         {/* Translations Tab */}
-        {task.result && (
+        {getAvailableTranslations(task).length > 0 && (
           <TabPanel value={tabValue} index={2}>
             <Box sx={{ px: 4 }}>
               <Typography
@@ -1035,65 +1065,67 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                   </Typography>
 
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                    {task.result.translations.map((translation, index) => {
-                      const translationStatus = (translation.status ||
-                        "done") as LanguageTaskStatus;
-                      const isFailedTranslation =
-                        translationStatus === "failed";
+                    {getAvailableTranslations(task).map(
+                      (translation, index) => {
+                        const translationStatus = (translation.status ||
+                          "done") as LanguageTaskStatus;
+                        const isFailedTranslation =
+                          translationStatus === "failed";
 
-                      return (
-                        <Box
-                          key={index}
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1,
-                            p: 1.5,
-                            background: isFailedTranslation
-                              ? "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)"
-                              : "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
-                            border: `1px solid ${
-                              isFailedTranslation ? "#fecaca" : "#bbf7d0"
-                            }`,
-                            borderRadius: 2,
-                          }}
-                        >
-                          <Typography
-                            variant="body2"
-                            sx={{ fontWeight: 600, color: "#1e293b" }}
-                          >
-                            {getLanguageDisplayName(translation.language)}:
-                          </Typography>
-                          <Chip
-                            label={translationStatus
-                              .replace("_", " ")
-                              .toUpperCase()}
-                            size="small"
+                        return (
+                          <Box
+                            key={index}
                             sx={{
-                              backgroundColor: isFailedTranslation
-                                ? "#ef4444"
-                                : "#10b981",
-                              color: "white",
-                              fontWeight: 600,
-                              fontSize: "0.7rem",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              p: 1.5,
+                              background: isFailedTranslation
+                                ? "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)"
+                                : "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)",
+                              border: `1px solid ${
+                                isFailedTranslation ? "#fecaca" : "#bbf7d0"
+                              }`,
+                              borderRadius: 2,
                             }}
-                          />
-                          {translation.complianceScore && (
+                          >
                             <Typography
-                              variant="caption"
-                              sx={{
-                                color: isFailedTranslation
-                                  ? "#dc2626"
-                                  : "#059669",
-                                fontWeight: 600,
-                              }}
+                              variant="body2"
+                              sx={{ fontWeight: 600, color: "#1e293b" }}
                             >
-                              ({translation.complianceScore}%)
+                              {getLanguageDisplayName(translation.language)}:
                             </Typography>
-                          )}
-                        </Box>
-                      );
-                    })}
+                            <Chip
+                              label={translationStatus
+                                .replace("_", " ")
+                                .toUpperCase()}
+                              size="small"
+                              sx={{
+                                backgroundColor: isFailedTranslation
+                                  ? "#ef4444"
+                                  : "#10b981",
+                                color: "white",
+                                fontWeight: 600,
+                                fontSize: "0.7rem",
+                              }}
+                            />
+                            {translation.complianceScore && (
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: isFailedTranslation
+                                    ? "#dc2626"
+                                    : "#059669",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                ({translation.complianceScore}%)
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      }
+                    )}
                   </Box>
 
                   {/* Quick stats */}
@@ -1105,12 +1137,12 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                       >
                         ✓ Successful:{" "}
                         {
-                          task.result.translations.filter(
+                          getAvailableTranslations(task).filter(
                             (t) => t.status !== "failed"
                           ).length
                         }
                       </Typography>
-                      {task.result.translations.some(
+                      {getAvailableTranslations(task).some(
                         (t) => t.status === "failed"
                       ) && (
                         <Typography
@@ -1119,7 +1151,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                         >
                           ✗ Failed:{" "}
                           {
-                            task.result.translations.filter(
+                            getAvailableTranslations(task).filter(
                               (t) => t.status === "failed"
                             ).length
                           }
@@ -1131,7 +1163,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
               </Card>
 
               <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                {task.result.translations.map((translation, index) => {
+                {getAvailableTranslations(task).map((translation, index) => {
                   const translationStatus = (translation.status ||
                     "done") as LanguageTaskStatus;
                   const isFailedTranslation = translationStatus === "failed";
@@ -1354,7 +1386,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 })}
               </Box>
 
-              {task.result.processedAt && (
+              {task.result?.processedAt && (
                 <Box
                   sx={{
                     mt: 3,
