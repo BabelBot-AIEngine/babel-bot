@@ -279,30 +279,50 @@ async function handleBabelWebhook(
 async function forwardToStateEndpoint(body: any): Promise<void> {
   const event: string | undefined = body?.event;
   if (!event) return;
-
-  const map: Record<string, string> = {
+  let path: string | undefined;
+  switch (event) {
     // translate state
-    "task.created": "/api/state/translate",
-    "language_subtask.created": "/api/state/translate",
-    "subtask.translation.started": "/api/state/translate",
+    case "task.created":
+    case "language_subtask.created":
+    case "subtask.translation.started":
+      path = "/api/state/translate";
+      break;
     // verify state
-    "subtask.translation.completed": "/api/state/verify",
-    "subtask.llm_verification.started": "/api/state/verify",
-    "subtask.llm_verification.completed": "/api/state/verify",
-    "subtask.llm_reverification.started": "/api/state/verify",
-    "subtask.llm_reverification.completed": "/api/state/verify",
+    case "subtask.translation.completed":
+    case "subtask.llm_verification.started":
+      path = "/api/state/verify";
+      break;
+    case "subtask.llm_verification.completed": {
+      const needsHumanReview = !!body?.data?.needsHumanReview;
+      path = needsHumanReview ? "/api/state/review" : "/api/state/finalize";
+      break;
+    }
+    case "subtask.llm_reverification.started":
+      path = "/api/state/verify";
+      break;
+    case "subtask.llm_reverification.completed": {
+      const needsAnotherIteration = !!body?.data?.needsAnotherIteration;
+      path = needsAnotherIteration
+        ? "/api/state/review"
+        : "/api/state/finalize";
+      break;
+    }
     // review state
-    "review_batch.created": "/api/state/review",
-    "prolific_study.created": "/api/state/review",
-    "prolific_study.published": "/api/state/review",
-    "prolific_results.received": "/api/state/review",
-    "subtask.iteration.continuing": "/api/state/review",
+    case "review_batch.created":
+    case "prolific_study.created":
+    case "prolific_study.published":
+    case "prolific_results.received":
+    case "subtask.iteration.continuing":
+      path = "/api/state/review";
+      break;
     // finalize state
-    "subtask.finalized": "/api/state/finalize",
-    "task.completed": "/api/state/finalize",
-  };
-
-  const path = map[event];
+    case "subtask.finalized":
+    case "task.completed":
+      path = "/api/state/finalize";
+      break;
+    default:
+      path = undefined;
+  }
   if (!path) {
     // Fallback to direct handler for unknown events
     await BabelWebhookHandler.handleWebhook(body);
