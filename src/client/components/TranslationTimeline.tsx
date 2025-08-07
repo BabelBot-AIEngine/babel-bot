@@ -13,6 +13,13 @@ import { LanguageTaskStatus } from "../../types";
 interface TranslationTimelineProps {
   currentStatus: LanguageTaskStatus | string; // Allow both legacy and enhanced statuses
   language: string;
+  iterations?: Array<{
+    iterationNumber: number;
+    llmVerification?: { score?: number; completedAt?: string };
+    humanReview?: { score?: number; completedAt?: string };
+    llmReverification?: { score?: number; completedAt?: string };
+    completedAt?: string;
+  }>;
 }
 
 // Legacy progression states
@@ -176,11 +183,12 @@ const stateConfig = {
 const TranslationTimeline: React.FC<TranslationTimelineProps> = ({
   currentStatus,
   language,
+  iterations,
 }) => {
   const isFailed = currentStatus === "failed";
   const isEnhanced = isEnhancedStatus(currentStatus);
 
-  // For enhanced statuses, just show the current state as a single status indicator
+  // For enhanced statuses, render a compact iterative timeline when iterations are provided
   if (isEnhanced || !stateConfig[currentStatus]) {
     const config = stateConfig[currentStatus] || {
       label: currentStatus
@@ -203,45 +211,118 @@ const TranslationTimeline: React.FC<TranslationTimelineProps> = ({
           Translation Status for {language}
         </Typography>
 
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            p: 2,
-            background: config.bgColor,
-            border: `1px solid ${config.borderColor}`,
-            borderRadius: 2,
-          }}
-        >
+        {iterations && iterations.length > 0 ? (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 1.5,
+              p: 2,
+              background: "#f8fafc",
+              border: `1px solid #e2e8f0`,
+              borderRadius: 2,
+            }}
+          >
+            {iterations.map((it, idx) => (
+              <Box
+                key={idx}
+                sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
+              >
+                {/* Iteration Badge */}
+                <Chip
+                  label={`Iteration ${it.iterationNumber}`}
+                  size="small"
+                  sx={{
+                    fontWeight: 700,
+                    background: "#e0e7ff",
+                    color: "#3730a3",
+                  }}
+                />
+
+                {/* Steps in this iteration */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  {/* LLM Verify */}
+                  <Chip
+                    icon={<VerificationIcon sx={{ fontSize: 16 }} />}
+                    label={it.llmVerification ? "LLM Check ✓" : "LLM Check"}
+                    size="small"
+                    sx={{
+                      background: it.llmVerification ? "#dcfce7" : "#eff6ff",
+                      color: it.llmVerification ? "#065f46" : "#1d4ed8",
+                      border: `1px solid ${
+                        it.llmVerification ? "#bbf7d0" : "#bfdbfe"
+                      }`,
+                    }}
+                  />
+                  {/* Human Review */}
+                  <Chip
+                    icon={<ReviewIcon sx={{ fontSize: 16 }} />}
+                    label={it.humanReview ? "Human Review ✓" : "Human Review"}
+                    size="small"
+                    sx={{
+                      background: it.humanReview ? "#ede9fe" : "#faf5ff",
+                      color: "#6b21a8",
+                      border: "1px solid #ddd6fe",
+                    }}
+                  />
+                  {/* Re-verify */}
+                  <Chip
+                    icon={<VerificationIcon sx={{ fontSize: 16 }} />}
+                    label={it.llmReverification ? "Re-check ✓" : "Re-check"}
+                    size="small"
+                    sx={{
+                      background: it.llmReverification ? "#dcfce7" : "#eff6ff",
+                      color: it.llmReverification ? "#065f46" : "#1d4ed8",
+                      border: `1px solid ${
+                        it.llmReverification ? "#bbf7d0" : "#bfdbfe"
+                      }`,
+                    }}
+                  />
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        ) : (
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              backgroundColor: config.color,
-              color: "white",
+              gap: 2,
+              p: 2,
+              background: config.bgColor,
+              border: `1px solid ${config.borderColor}`,
+              borderRadius: 2,
             }}
           >
-            <IconComponent fontSize="small" />
-          </Box>
-          <Box>
-            <Typography
-              variant="body2"
-              sx={{ fontWeight: 600, color: config.color }}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                backgroundColor: config.color,
+                color: "white",
+              }}
             >
-              {config.label}
-            </Typography>
-            {currentStatus.includes("iteration") && (
-              <Typography variant="caption" sx={{ color: "#6b7280" }}>
-                Review cycle complete
+              <IconComponent fontSize="small" />
+            </Box>
+            <Box>
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 600, color: config.color }}
+              >
+                {config.label}
               </Typography>
-            )}
+              {currentStatus.includes("iteration") && (
+                <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                  Review cycle complete
+                </Typography>
+              )}
+            </Box>
           </Box>
-        </Box>
+        )}
       </Box>
     );
   }

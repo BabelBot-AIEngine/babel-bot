@@ -45,16 +45,36 @@ const getAvailableTranslations = (task: TranslationTask): any[] => {
   const enhancedTask = task as any;
   const translations: any[] = [];
 
+  const computeComplianceScore = (subTask: any): number | undefined => {
+    if (!subTask?.iterations || subTask.iterations.length === 0)
+      return undefined;
+    const latest: any = subTask.iterations[subTask.iterations.length - 1];
+    if (typeof latest.combinedScore === "number")
+      return Math.round(latest.combinedScore * 20);
+    if (
+      latest.llmReverification &&
+      typeof latest.llmReverification.score === "number"
+    ) {
+      return Math.round(latest.llmReverification.score * 20);
+    }
+    if (
+      latest.llmVerification &&
+      typeof latest.llmVerification.score === "number"
+    ) {
+      return Math.round(latest.llmVerification.score * 20);
+    }
+    return undefined;
+  };
+
   if (enhancedTask.languageSubTasks) {
     Object.entries(enhancedTask.languageSubTasks).forEach(
       ([language, subTask]: [string, any]) => {
-        // Only show translations that have been translated (not just pending)
         if (subTask.translatedText) {
           translations.push({
             language,
             translatedText: subTask.translatedText,
             status: subTask.status,
-            complianceScore: subTask.complianceScore,
+            complianceScore: computeComplianceScore(subTask),
           });
         }
       }

@@ -480,6 +480,8 @@ export class EnhancedDatabaseService {
         | "updatedAt"
         | "progress"
         | "destinationLanguages"
+        | "mediaArticle"
+        | "languageSubTasks"
       >
     >
   > {
@@ -503,6 +505,8 @@ export class EnhancedDatabaseService {
       "updatedAt",
       "progress",
       "destinationLanguages",
+      "mediaArticle",
+      "languageSubTasks",
     ] as const;
 
     const summaries = await Promise.all(
@@ -511,6 +515,20 @@ export class EnhancedDatabaseService {
           `enhanced_task:${id}`,
           ...fields
         )) as Record<string, string>;
+
+        // Reduce languageSubTasks down to just status to keep payload light
+        const rawSubTasks = values.languageSubTasks;
+        const parsedSubTasks = this.safeJSONParse(
+          rawSubTasks,
+          {},
+          "languageSubTasks"
+        );
+        const minimizedSubTasks: Record<string, { status: string }> = {};
+        if (parsedSubTasks && typeof parsedSubTasks === "object") {
+          Object.entries(parsedSubTasks).forEach(([lang, subTask]: any) => {
+            minimizedSubTasks[lang] = { status: subTask?.status };
+          });
+        }
 
         return {
           id: values.id,
@@ -523,6 +541,12 @@ export class EnhancedDatabaseService {
             [],
             "destinationLanguages"
           ),
+          mediaArticle: this.safeJSONParse(
+            values.mediaArticle,
+            { text: "", title: "", metadata: {} },
+            "mediaArticle"
+          ),
+          languageSubTasks: minimizedSubTasks as any,
         };
       })
     );

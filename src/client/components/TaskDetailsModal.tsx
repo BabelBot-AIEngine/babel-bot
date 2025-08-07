@@ -96,16 +96,51 @@ const getAvailableTranslations = (task: TranslationTask): any[] => {
   const enhancedTask = task as any;
   const translations: any[] = [];
 
+  const computeComplianceScore = (subTask: any): number | undefined => {
+    if (!subTask?.iterations || subTask.iterations.length === 0)
+      return undefined;
+    const latest: any = subTask.iterations[subTask.iterations.length - 1];
+    // Prefer combinedScore, then llmReverification, then llmVerification
+    if (typeof latest.combinedScore === "number")
+      return Math.round(latest.combinedScore * 20);
+    if (
+      latest.llmReverification &&
+      typeof latest.llmReverification.score === "number"
+    ) {
+      return Math.round(latest.llmReverification.score * 20);
+    }
+    if (
+      latest.llmVerification &&
+      typeof latest.llmVerification.score === "number"
+    ) {
+      return Math.round(latest.llmVerification.score * 20);
+    }
+    return undefined;
+  };
+
+  const collectReviewNotes = (subTask: any): string[] | undefined => {
+    if (!subTask?.iterations) return undefined;
+    const notes: string[] = [];
+    for (const it of subTask.iterations) {
+      if (it.llmVerification?.feedback) notes.push(it.llmVerification.feedback);
+      if (it.humanReview?.feedback) notes.push(it.humanReview.feedback);
+      if (it.llmReverification?.feedback)
+        notes.push(it.llmReverification.feedback);
+    }
+    return notes.length > 0 ? notes : undefined;
+  };
+
   if (enhancedTask.languageSubTasks) {
     Object.entries(enhancedTask.languageSubTasks).forEach(
       ([language, subTask]: [string, any]) => {
-        // Only show translations that have been translated (not just pending)
         if (subTask.translatedText) {
           translations.push({
             language,
             translatedText: subTask.translatedText,
             status: subTask.status,
-            complianceScore: subTask.complianceScore,
+            complianceScore: computeComplianceScore(subTask),
+            reviewNotes: collectReviewNotes(subTask),
+            iterations: subTask.iterations || [],
           });
         }
       }
@@ -1292,6 +1327,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                           language={getLanguageDisplayName(
                             translation.language
                           )}
+                          iterations={translation.iterations}
                         />
 
                         {/* Alert box for failed translations */}
