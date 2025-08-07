@@ -259,7 +259,8 @@ async function handleBabelWebhook(
   waitUntil(
     (async () => {
       try {
-        await BabelWebhookHandler.handleWebhook(body);
+        // Forward to state-specific endpoint to break perceived self-loop
+        await forwardToStateEndpoint(body);
         console.log(
           "[WEBHOOK-ENDPOINT] ✅ Async webhook processing completed successfully"
         );
@@ -273,4 +274,81 @@ async function handleBabelWebhook(
       }
     })()
   );
+}
+
+async function forwardToStateEndpoint(body: any): Promise<void> {
+  const event: string | undefined = body?.event;
+  if (!event) return;
+
+  const map: Record<string, string> = {
+    // translate state
+    "task.created": "/api/state/translate",
+    "language_subtask.created": "/api/state/translate",
+    "subtask.translation.started": "/api/state/translate",
+    // verify state
+    "subtask.translation.completed": "/api/state/verify",
+    "subtask.llm_verification.started": "/api/state/verify",
+    "subtask.llm_verification.completed": "/api/state/verify",
+    "subtask.llm_reverification.started": "/api/state/verify",
+    "subtask.llm_reverification.completed": "/api/state/verify",
+    // review state
+    "review_batch.created": "/api/state/review",
+    "prolific_study.created": "/api/state/review",
+    "prolific_study.published": "/api/state/review",
+    "prolific_results.received": "/api/state/review",
+    "subtask.iteration.continuing": "/api/state/review",
+    // finalize state
+    "subtask.finalized": "/api/state/finalize",
+    "task.completed": "/api/state/finalize",
+  };
+
+  const path = map[event];
+  if (!path) {
+    // Fallback to direct handler for unknown events
+    await BabelWebhookHandler.handleWebhook(body);
+    return;
+  }
+
+  // Build absolute URL
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : `${process.env.BASE_URL || "http://localhost:3000"}`;
+  const url = `${baseUrl}${path}`;
+
+  // Re-sign the body for internal hop
+  const secret = process.env.BABEL_WEBHOOK_SECRET!;
+  const rawBody = JSON.stringify(body);
+  const timestamp = (
+    body?.timestamp ?? Math.floor(Date.now() / 1000)
+  ).toString();
+  const signature = WebhookVerificationService.generateBabelSignature(
+    rawBody,
+    timestamp,
+    secret
+  );
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Babel-Request-Signature": signature,
+    "X-Babel-Request-Timestamp": timestamp,
+    "User-Agent": "BabelBot-Webhook-Forwarder/1.0",
+  };
+
+  const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (bypassSecret) headers["x-vercel-protection-bypass"] = bypassSecret;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: rawBody,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    console.error(
+      `[WEBHOOK-ENDPOINT] State forward failed ${response.status}: ${text}`
+    );
+    // Fallback to direct handler
+    await BabelWebhookHandler.handleWebhook(body);
+  }
 }
