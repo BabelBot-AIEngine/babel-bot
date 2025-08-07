@@ -929,7 +929,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                 </Typography>
 
                 <Grid container spacing={3}>
-                  {task.editorialGuidelines.tone && (
+                  {task.editorialGuidelines?.tone && (
                     <Grid item xs={12} md={4}>
                       <Box
                         sx={{
@@ -947,13 +947,13 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                           Tone
                         </Typography>
                         <Typography variant="body1" sx={{ color: "#4c1d95" }}>
-                          {task.editorialGuidelines.tone}
+                          {task.editorialGuidelines?.tone}
                         </Typography>
                       </Box>
                     </Grid>
                   )}
 
-                  {task.editorialGuidelines.style && (
+                  {task.editorialGuidelines?.style && (
                     <Grid item xs={12} md={4}>
                       <Box
                         sx={{
@@ -971,13 +971,13 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                           Style
                         </Typography>
                         <Typography variant="body1" sx={{ color: "#1e3a8a" }}>
-                          {task.editorialGuidelines.style}
+                          {task.editorialGuidelines?.style}
                         </Typography>
                       </Box>
                     </Grid>
                   )}
 
-                  {task.editorialGuidelines.targetAudience && (
+                  {task.editorialGuidelines?.targetAudience && (
                     <Grid item xs={12} md={4}>
                       <Box
                         sx={{
@@ -995,15 +995,15 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                           Target Audience
                         </Typography>
                         <Typography variant="body1" sx={{ color: "#064e3b" }}>
-                          {task.editorialGuidelines.targetAudience}
+                          {task.editorialGuidelines?.targetAudience}
                         </Typography>
                       </Box>
                     </Grid>
                   )}
 
-                  {!task.editorialGuidelines.tone &&
-                    !task.editorialGuidelines.style &&
-                    !task.editorialGuidelines.targetAudience && (
+                  {!task.editorialGuidelines?.tone &&
+                    !task.editorialGuidelines?.style &&
+                    !task.editorialGuidelines?.targetAudience && (
                       <Grid item xs={12}>
                         <Box
                           sx={{

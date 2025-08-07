@@ -374,7 +374,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
               color: "#1e293b",
             }}
           >
-            {task.id.split("_")[1]}
+            {task.mediaArticle?.title?.trim() || task.id.split("_")[1]}
             {isPartialDisplay && (
               <Chip
                 label="PARTIAL"
