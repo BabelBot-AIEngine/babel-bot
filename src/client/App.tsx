@@ -33,6 +33,8 @@ import {
   useAuth,
   SignOutButton,
 } from "@clerk/clerk-react";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import KanbanBoard from "./components/KanbanBoard";
 import CreateTaskDialog from "./components/CreateTaskDialog";
 import { TranslationTask } from "../types";
@@ -113,7 +115,7 @@ const App: React.FC = () => {
         return;
       }
 
-      const response = await fetch("/api/tasks", {
+      const response = await fetch("/api/tasks?summary=true&limit=100", {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -152,6 +154,7 @@ const App: React.FC = () => {
     mediaArticle: { text: string; title?: string };
     editorialGuidelines: Record<string, any>;
     destinationLanguages: string[];
+    useEnhancedProcessing?: boolean;
   }) => {
     try {
       const token = await getToken();
@@ -185,6 +188,8 @@ const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <Analytics />
+      <SpeedInsights />
       <Box
         sx={{
           flexGrow: 1,

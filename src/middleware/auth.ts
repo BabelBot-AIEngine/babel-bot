@@ -20,6 +20,16 @@ export const requireAuth = async (
   next: NextFunction
 ) => {
   try {
+    // Local development bypass
+    const isLocalDev =
+      process.env.NODE_ENV === "development" || !process.env.VERCEL;
+    if (isLocalDev) {
+      console.log(
+        "[AUTH] 🏠 Local development mode - bypassing authentication"
+      );
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {

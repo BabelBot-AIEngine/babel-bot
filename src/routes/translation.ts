@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { TaskService } from "../services/taskService";
+import { EnhancedTaskService } from "../services/enhancedTaskService";
 import { TranslationService } from "../services/translationService";
 import { FilterService } from "../services/filterService";
 import {
@@ -7,12 +8,48 @@ import {
   TaskStatusResponse,
   TaskListResponse,
   FilterRecommendationRequest,
+  TranslationTask,
+  TranslationResponse,
+  TranslationResult,
+  LanguageTaskStatus,
+  GuideType,
 } from "../types";
+import {
+  EnhancedTranslationTask,
+  TaskStatus as EnhancedTaskStatus,
+} from "../types/enhanced-task";
 
 const router = Router();
 const taskService = new TaskService();
+const enhancedTaskService = new EnhancedTaskService();
 const translationService = new TranslationService();
 const filterService = new FilterService();
+
+// Feature flag for enhanced processing (default: true for new installations)
+const USE_ENHANCED_PROCESSING = process.env.USE_ENHANCED_PROCESSING !== "false";
+
+// Helper function for status filtering (enhanced to legacy mapping)
+const mapEnhancedStatusToLegacy = (
+  enhancedStatus: EnhancedTaskStatus
+): TranslationTask["status"] => {
+  switch (enhancedStatus) {
+    case "pending":
+      return "pending";
+    case "processing":
+      return "translating";
+    case "review_pending":
+    case "review_active":
+      return "human_review";
+    case "finalizing":
+      return "translating"; // Still processing
+    case "completed":
+      return "done";
+    case "failed":
+      return "failed";
+    default:
+      return "pending";
+  }
+};
 
 router.post("/translate", async (req: Request, res: Response) => {
   try {
@@ -22,7 +59,8 @@ router.post("/translate", async (req: Request, res: Response) => {
       destinationLanguages,
       guide,
       useFullMarkdown,
-    }: TranslationRequest = req.body;
+      useEnhancedProcessing,
+    }: TranslationRequest & { useEnhancedProcessing?: boolean } = req.body;
 
     if (!mediaArticle || !mediaArticle.text) {
       return res.status(400).json({
@@ -43,18 +81,55 @@ router.post("/translate", async (req: Request, res: Response) => {
       });
     }
 
-    const taskId = await taskService.createTranslationTask(
-      mediaArticle,
-      editorialGuidelines || {},
-      destinationLanguages,
-      guide,
-      useFullMarkdown
-    );
+    let taskId: string;
+    let processingType: string;
+    let pollUrl: string;
+
+    // Use parameter from request, fallback to environment variable, default to enhanced
+    const shouldUseEnhanced =
+      useEnhancedProcessing !== undefined
+        ? useEnhancedProcessing
+        : USE_ENHANCED_PROCESSING;
+
+    if (shouldUseEnhanced) {
+      // Use enhanced webhook-driven processing
+      taskId = await enhancedTaskService.createTranslationTask(
+        mediaArticle,
+        editorialGuidelines || {},
+        destinationLanguages,
+        guide,
+        useFullMarkdown,
+        3, // maxReviewIterations - default
+        4.5 // confidenceThreshold - default
+      );
+      processingType = "enhanced";
+      pollUrl = `/api/tasks/${taskId}`;
+    } else {
+      // Use legacy processing
+      taskId = await taskService.createTranslationTask(
+        mediaArticle,
+        editorialGuidelines || {},
+        destinationLanguages,
+        guide,
+        useFullMarkdown
+      );
+      processingType = "legacy";
+      pollUrl = `/api/tasks/${taskId}`;
+    }
 
     res.json({
       taskId,
-      message: "Translation task created successfully",
-      pollUrl: `/api/tasks/${taskId}`,
+      message: `Translation task created successfully (${processingType} processing)`,
+      pollUrl,
+      processingType,
+      enhancedFeatures: shouldUseEnhanced
+        ? {
+            concurrentLanguages: true,
+            iterativeReview: true,
+            maxIterations: 3,
+            confidenceThreshold: 4.5,
+          }
+        : undefined,
     });
   } catch (error) {
     console.error("Translation error:", error);
@@ -90,16 +165,25 @@ router.get("/health", (req: Request, res: Response) => {
 router.get("/tasks/:taskId", async (req: Request, res: Response) => {
   try {
     const { taskId } = req.params;
-    const task = await taskService.getTask(taskId);
 
-    if (!task) {
-      return res.status(404).json({
-        error: "Task not found",
-      });
+    // Try enhanced task first, then fallback to legacy
+    const enhancedTask = await enhancedTaskService.getTask(taskId);
+    if (enhancedTask) {
+      const taskWithType = { ...enhancedTask, type: "enhanced" as const };
+      res.json({ task: taskWithType });
+      return;
     }
 
-    const response: TaskStatusResponse = { task };
-    res.json(response);
+    const legacyTask = await taskService.getTask(taskId);
+    if (legacyTask) {
+      const taskWithType = { ...legacyTask, type: "legacy" as const };
+      res.json({ task: taskWithType });
+      return;
+    }
+
+    res.status(404).json({
+      error: "Task not found",
+    });
   } catch (error) {
     console.error("Error fetching task:", error);
     res.status(500).json({
@@ -110,16 +194,66 @@ router.get("/tasks/:taskId", async (req: Request, res: Response) => {
 
 router.get("/tasks", async (req: Request, res: Response) => {
   try {
-    const { status } = req.query;
+    const { status, limit, summary } = req.query as {
+      status?: string;
+      limit?: string;
+      summary?: string;
+    };
 
-    let tasks;
+    // Summary mode: return minimal fields and allow limiting results
+    const useSummary = summary === "true";
+    const limitNum = limit
+      ? Math.max(1, Math.min(200, parseInt(limit, 10)))
+      : undefined;
+
+    // Get both enhanced and legacy tasks
+    let legacyTasks: TranslationTask[] = [];
+    let enhancedTasks: any[] = [];
+
     if (status && typeof status === "string") {
-      tasks = await taskService.getTasksByStatus(status as any);
+      legacyTasks = await taskService.getTasksByStatus(status as any);
+      // For enhanced tasks, we'll need to filter after adding type info since status mapping is complex
+      enhancedTasks = useSummary
+        ? await enhancedTaskService.getAllTasksSummary(limitNum)
+        : await enhancedTaskService.getAllTasks();
     } else {
-      tasks = await taskService.getAllTasks();
+      legacyTasks = await taskService.getAllTasks();
+      enhancedTasks = useSummary
+        ? await enhancedTaskService.getAllTasksSummary(limitNum)
+        : await enhancedTaskService.getAllTasks();
     }
 
-    const response: TaskListResponse = { tasks };
+    // Add type property to each task
+    const legacyTasksWithType = legacyTasks.map((task) => ({
+      ...task,
+      type: "legacy" as const,
+    }));
+    const enhancedTasksWithType = enhancedTasks.map((task) => ({
+      ...task,
+      type: "enhanced" as const,
+    }));
+
+    // Combine and sort by creation date (newest first)
+    const allTasks = [...legacyTasksWithType, ...enhancedTasksWithType].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    // Filter by status if requested (after combining since enhanced/legacy have different status systems)
+    let filteredTasks = allTasks;
+    if (status && typeof status === "string") {
+      filteredTasks = allTasks.filter((task) => {
+        if (task.type === "legacy") {
+          return task.status === status;
+        } else {
+          // For enhanced tasks, map their status to legacy equivalent for filtering
+          return mapEnhancedStatusToLegacy(task.status) === status;
+        }
+      });
+    }
+
+    // Cast to any to handle mixed task types
+    const response = { tasks: filteredTasks };
     res.json(response);
   } catch (error) {
     console.error("Error fetching tasks:", error);
