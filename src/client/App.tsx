@@ -144,12 +144,14 @@ const App: React.FC = () => {
 
   return (
     <ThemeProvider defaultTheme="light" storageKey="vibe-kanban-theme">
-      <div className="min-h-screen bg-gradient-to-br from-primary/20 via-secondary/20 to-primary/30 dark:from-primary/10 dark:via-secondary/10 dark:to-primary/20">
+      <div className="min-h-screen bg-gradient-to-br from-primary/25 via-secondary/30 to-primary/35 dark:from-primary/15 dark:via-secondary/20 dark:to-accent/15 relative">
+        {/* Background pattern overlay */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.15)_1px,transparent_0)] [background-size:20px_20px] dark:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)]" />
         {/* Show unauthorized access page for non-@prolific.com users */}
         <SignedIn>
           {!isAuthorizedUser && (
-            <div className="container mx-auto max-w-2xl py-16 px-4">
-              <Card className="p-8 text-center bg-background/95 backdrop-blur-sm border-2 border-destructive/50">
+            <div className="container mx-auto max-w-2xl py-16 px-4 relative z-10">
+              <Card className="p-8 text-center glass-card border-2 border-destructive/50">
                 <CardContent className="space-y-6 p-0">
                   <Shield className="mx-auto h-16 w-16 text-destructive" />
                   <div className="space-y-2">
@@ -190,13 +192,13 @@ const App: React.FC = () => {
           )}
         </SignedIn>
         {/* Navigation Header */}
-        <header className="bg-background/10 backdrop-blur-md border-b border-border/20">
+        <header className="bg-background/30 backdrop-blur-xl border-b border-border/40 relative z-20 shadow-lg shadow-primary/5">
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-between h-16">
               {/* Logo and Title */}
               <div className="flex items-center space-x-3">
                 <Languages className="h-8 w-8 text-primary" />
-                <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                <h1 className="text-xl font-bold text-gradient-primary">
                   Translation Hub
                 </h1>
               </div>
@@ -278,7 +280,7 @@ const App: React.FC = () => {
         <SignedIn>
           {isAuthorizedUser && (
             <>
-              <main className="container mx-auto py-8 px-4 max-w-7xl">
+              <main className="container mx-auto py-8 px-4 max-w-7xl relative z-10">
                 <KanbanBoard tasks={tasks} loading={loading} />
               </main>
 
@@ -293,12 +295,12 @@ const App: React.FC = () => {
 
         {/* Welcome page for signed out users */}
         <SignedOut>
-          <div className="container mx-auto max-w-2xl py-16 px-4">
-            <Card className="p-8 text-center bg-background/95 backdrop-blur-sm">
+          <div className="container mx-auto max-w-2xl py-16 px-4 relative z-10">
+            <Card className="p-8 text-center glass-card">
               <CardContent className="space-y-6 p-0">
                 <Languages className="mx-auto h-16 w-16 text-primary" />
                 <div className="space-y-4">
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  <h1 className="text-4xl font-bold text-gradient-primary">
                     Welcome to Translation Hub
                   </h1>
                   <p className="text-lg text-muted-foreground">

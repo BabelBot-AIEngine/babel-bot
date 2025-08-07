@@ -74,7 +74,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, filteredLanguages, i
 
   return (
     <Card 
-      className="bg-card/80 backdrop-blur-sm border border-border/30 cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:scale-[1.02] relative overflow-hidden group"
+      className="glass-card cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:scale-[1.02] relative overflow-hidden group"
       onClick={onClick}
     >
       {/* Status indicator bar at top */}

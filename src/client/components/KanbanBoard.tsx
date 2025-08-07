@@ -116,7 +116,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
           
           return (
             <div key={column.status} className="min-h-[700px]">
-              <Card className="h-full bg-card/90 backdrop-blur-md border border-border/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+              <Card className="h-full glass-card transition-all duration-500 hover:-translate-y-1">
                 <CardContent className="p-4 h-full flex flex-col">
                   {/* Column Header */}
                   <div className="flex items-center mb-4 pb-3 border-b border-border/50">
