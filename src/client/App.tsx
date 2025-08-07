@@ -1,30 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  Container,
-  Typography,
-  Box,
-  AppBar,
-  Toolbar,
-  Button,
-  Dialog,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  ThemeProvider,
-  createTheme,
-  CssBaseline,
-  Paper,
-} from "@mui/material";
-import {
-  Add as AddIcon,
-  Refresh as RefreshIcon,
-  Translate as TranslateIcon,
-  Login as LoginIcon,
-  Block as BlockIcon,
-  ExitToApp as SignOutIcon,
-} from "@mui/icons-material";
-import {
   SignedIn,
   SignedOut,
   SignInButton,
@@ -33,62 +8,47 @@ import {
   useAuth,
   SignOutButton,
 } from "@clerk/clerk-react";
+import {
+  Plus,
+  RefreshCw,
+  Languages,
+  LogIn,
+  Shield,
+  LogOut,
+  Moon,
+  Sun,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import { useTheme } from "@/components/ThemeProvider";
 import KanbanBoard from "./components/KanbanBoard";
 import CreateTaskDialog from "./components/CreateTaskDialog";
 import { TranslationTask } from "../types";
 
-const theme = createTheme({
-  palette: {
-    mode: "light",
-    primary: {
-      main: "#6366f1",
-      light: "#818cf8",
-      dark: "#4f46e5",
-    },
-    secondary: {
-      main: "#ec4899",
-      light: "#f472b6",
-      dark: "#db2777",
-    },
-    background: {
-      default: "#f8fafc",
-      paper: "#ffffff",
-    },
-    text: {
-      primary: "#1e293b",
-      secondary: "#64748b",
-    },
-  },
-  typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-    h6: {
-      fontWeight: 600,
-      fontSize: "1.25rem",
-    },
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 12,
-          textTransform: "none",
-          fontWeight: 500,
-          boxShadow: "none",
-          "&:hover": {
-            boxShadow: "0 4px 12px 0 rgba(0, 0, 0, 0.15)",
-          },
-        },
-      },
-    },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          borderRadius: 16,
-        },
-      },
-    },
-  },
-});
+function ThemeToggle() {
+  const { setTheme } = useTheme();
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark')}
+      className="h-8 w-8 p-0"
+    >
+      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <span className="sr-only">Toggle theme</span>
+    </Button>
+  );
+}
 
 const App: React.FC = () => {
   const { user } = useUser();
@@ -183,243 +143,144 @@ const App: React.FC = () => {
   };
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box
-        sx={{
-          flexGrow: 1,
-          minHeight: "100vh",
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-        }}
-      >
+    <ThemeProvider defaultTheme="light" storageKey="vibe-kanban-theme">
+      <div className="min-h-screen bg-gradient-to-br from-primary/20 via-secondary/20 to-primary/30 dark:from-primary/10 dark:via-secondary/10 dark:to-primary/20">
         {/* Show unauthorized access page for non-@prolific.com users */}
         <SignedIn>
           {!isAuthorizedUser && (
-            <Container maxWidth="md" sx={{ py: 8 }}>
-              <Paper
-                elevation={8}
-                sx={{
-                  p: 6,
-                  textAlign: "center",
-                  background: "rgba(255, 255, 255, 0.95)",
-                  backdropFilter: "blur(20px)",
-                  borderRadius: 4,
-                  border: "2px solid #f87171",
-                }}
-              >
-                <BlockIcon sx={{ fontSize: 64, color: "#dc2626", mb: 2 }} />
-                <Typography
-                  variant="h3"
-                  component="h1"
-                  gutterBottom
-                  sx={{ fontWeight: 700, color: "#dc2626" }}
-                >
-                  Access Denied
-                </Typography>
-                <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
-                  This application is restricted to Prolific team members only.
-                </Typography>
-                <Typography
-                  variant="body1"
-                  color="text.secondary"
-                  sx={{ mb: 4 }}
-                >
-                  You must sign in with a <strong>@prolific.com</strong> email
-                  address to access this application.
-                  {user?.emailAddresses?.[0] && (
-                    <>
-                      <br />
-                      <br />
-                      Currently signed in as:{" "}
-                      <strong>{user.emailAddresses[0].emailAddress}</strong>
-                    </>
-                  )}
-                </Typography>
-                <SignOutButton>
-                  <Button
-                    variant="contained"
-                    size="large"
-                    startIcon={<SignOutIcon />}
-                    sx={{
-                      background:
-                        "linear-gradient(45deg, #dc2626 30%, #b91c1c 90%)",
-                      color: "white",
-                      fontWeight: 600,
-                      px: 4,
-                      py: 1.5,
-                      fontSize: "1.1rem",
-                      "&:hover": {
-                        background:
-                          "linear-gradient(45deg, #b91c1c 30%, #991b1b 90%)",
-                        transform: "translateY(-2px)",
-                      },
-                    }}
-                  >
-                    Sign Out & Try Again
-                  </Button>
-                </SignOutButton>
-              </Paper>
-            </Container>
+            <div className="container mx-auto max-w-2xl py-16 px-4">
+              <Card className="p-8 text-center bg-background/95 backdrop-blur-sm border-2 border-destructive/50">
+                <CardContent className="space-y-6 p-0">
+                  <Shield className="mx-auto h-16 w-16 text-destructive" />
+                  <div className="space-y-2">
+                    <h1 className="text-3xl font-bold text-destructive">
+                      Access Denied
+                    </h1>
+                    <p className="text-lg text-muted-foreground">
+                      This application is restricted to Prolific team members only.
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    <p className="text-muted-foreground">
+                      You must sign in with a <strong>@prolific.com</strong> email
+                      address to access this application.
+                      {user?.emailAddresses?.[0] && (
+                        <>
+                          <br />
+                          <br />
+                          Currently signed in as:{" "}
+                          <strong>{user.emailAddresses[0].emailAddress}</strong>
+                        </>
+                      )}
+                    </p>
+                    <SignOutButton>
+                      <Button 
+                        size="lg" 
+                        variant="destructive"
+                        className="text-lg px-8 py-3"
+                      >
+                        <LogOut className="mr-2 h-5 w-5" />
+                        Sign Out & Try Again
+                      </Button>
+                    </SignOutButton>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </SignedIn>
-        <AppBar
-          position="static"
-          elevation={0}
-          sx={{
-            background: "rgba(255, 255, 255, 0.1)",
-            backdropFilter: "blur(20px)",
-            borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
-          }}
-        >
-          <Toolbar sx={{ py: 1 }}>
-            <Box sx={{ display: "flex", alignItems: "center", flexGrow: 1 }}>
-              <TranslateIcon sx={{ mr: 2, fontSize: 32, color: "white" }} />
-              <Typography
-                variant="h6"
-                component="div"
-                sx={{
-                  color: "white",
-                  fontWeight: 700,
-                  fontSize: "1.5rem",
-                  background:
-                    "linear-gradient(45deg, #ffffff 30%, #e0e7ff 90%)",
-                  backgroundClip: "text",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                }}
-              >
-                Translation Hub
-              </Typography>
-            </Box>
-            <FormControl size="small" sx={{ mr: 2, minWidth: 120 }}>
-              <InputLabel sx={{ color: "white" }}>Poll Rate</InputLabel>
-              <Select
-                value={pollingInterval}
-                onChange={(e) => setPollingInterval(Number(e.target.value))}
-                label="Poll Rate"
-                sx={{
-                  color: "white",
-                  "& .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "rgba(255, 255, 255, 0.23)",
-                  },
-                  "&:hover .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "rgba(255, 255, 255, 0.87)",
-                  },
-                  "& .MuiSvgIcon-root": {
-                    color: "white",
-                  },
-                }}
-              >
-                <MenuItem value={1000}>1s</MenuItem>
-                <MenuItem value={5000}>5s</MenuItem>
-                <MenuItem value={15000}>15s</MenuItem>
-                <MenuItem value={30000}>30s</MenuItem>
-                <MenuItem value={60000}>60s</MenuItem>
-                <MenuItem value={300000}>5min</MenuItem>
-              </Select>
-            </FormControl>
-            <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <Button
-                    variant="outlined"
-                    startIcon={<LoginIcon />}
-                    sx={{
-                      color: "white",
-                      borderColor: "rgba(255, 255, 255, 0.3)",
-                      background: "rgba(255, 255, 255, 0.1)",
-                      backdropFilter: "blur(10px)",
-                      "&:hover": {
-                        borderColor: "rgba(255, 255, 255, 0.5)",
-                        background: "rgba(255, 255, 255, 0.2)",
-                      },
-                    }}
-                  >
-                    Sign In
-                  </Button>
-                </SignInButton>
-              </SignedOut>
-              <SignedIn>
-                {isAuthorizedUser ? (
-                  <>
-                    <Button
-                      variant="outlined"
-                      startIcon={<RefreshIcon />}
-                      onClick={() => fetchTasks(true)}
-                      disabled={loading}
-                      sx={{
-                        color: "white",
-                        borderColor: "rgba(255, 255, 255, 0.3)",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        backdropFilter: "blur(10px)",
-                        "&:hover": {
-                          borderColor: "rgba(255, 255, 255, 0.5)",
-                          background: "rgba(255, 255, 255, 0.2)",
-                        },
-                      }}
-                    >
-                      Refresh
+        {/* Navigation Header */}
+        <header className="bg-background/10 backdrop-blur-md border-b border-border/20">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between h-16">
+              {/* Logo and Title */}
+              <div className="flex items-center space-x-3">
+                <Languages className="h-8 w-8 text-primary" />
+                <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  Translation Hub
+                </h1>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center space-x-4">
+                {/* Poll Rate Selector */}
+                <div className="flex items-center space-x-2">
+                  <Select value={pollingInterval.toString()} onValueChange={(value) => setPollingInterval(Number(value))}>
+                    <SelectTrigger className="w-24 bg-background/20 border-border/30 text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1000">1s</SelectItem>
+                      <SelectItem value="5000">5s</SelectItem>
+                      <SelectItem value="15000">15s</SelectItem>
+                      <SelectItem value="30000">30s</SelectItem>
+                      <SelectItem value="60000">60s</SelectItem>
+                      <SelectItem value="300000">5min</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Theme Toggle */}
+                <ThemeToggle />
+
+                {/* Auth Controls */}
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <Button variant="outline" className="bg-background/20 border-border/30 hover:bg-background/30">
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Sign In
                     </Button>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={() => setIsCreateDialogOpen(true)}
-                      sx={{
-                        background:
-                          "linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)",
-                        color: "white",
-                        fontWeight: 600,
-                        px: 3,
-                        "&:hover": {
-                          background:
-                            "linear-gradient(45deg, #4f46e5 30%, #7c3aed 90%)",
-                          transform: "translateY(-1px)",
-                        },
-                      }}
-                    >
-                      New Task
-                    </Button>
-                    <UserButton
-                      appearance={{
-                        elements: {
-                          avatarBox: "w-10 h-10",
-                        },
-                      }}
-                    />
-                  </>
-                ) : (
-                  // Show sign-out option for unauthorized users
-                  <SignOutButton>
-                    <Button
-                      variant="outlined"
-                      startIcon={<SignOutIcon />}
-                      sx={{
-                        color: "white",
-                        borderColor: "rgba(255, 255, 255, 0.3)",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        backdropFilter: "blur(10px)",
-                        "&:hover": {
-                          borderColor: "rgba(255, 255, 255, 0.5)",
-                          background: "rgba(255, 255, 255, 0.2)",
-                        },
-                      }}
-                    >
-                      Sign Out
-                    </Button>
-                  </SignOutButton>
-                )}
-              </SignedIn>
-            </Box>
-          </Toolbar>
-        </AppBar>
+                  </SignInButton>
+                </SignedOut>
+
+                <SignedIn>
+                  {isAuthorizedUser ? (
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => fetchTasks(true)}
+                        disabled={loading}
+                        className="bg-background/20 border-border/30 hover:bg-background/30"
+                      >
+                        <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
+                      <Button 
+                        onClick={() => setIsCreateDialogOpen(true)}
+                        className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Task
+                      </Button>
+                      <UserButton
+                        appearance={{
+                          elements: {
+                            avatarBox: "w-8 h-8",
+                          },
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <SignOutButton>
+                      <Button variant="outline" className="bg-background/20 border-border/30 hover:bg-background/30">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </Button>
+                    </SignOutButton>
+                  )}
+                </SignedIn>
+              </div>
+            </div>
+          </div>
+        </header>
 
         {/* Main app content - only for authorized users */}
         <SignedIn>
           {isAuthorizedUser && (
             <>
-              <Container maxWidth="xl" sx={{ py: 4 }}>
+              <main className="container mx-auto py-8 px-4 max-w-7xl">
                 <KanbanBoard tasks={tasks} loading={loading} />
-              </Container>
+              </main>
 
               <CreateTaskDialog
                 open={isCreateDialogOpen}
@@ -430,64 +291,38 @@ const App: React.FC = () => {
           )}
         </SignedIn>
 
+        {/* Welcome page for signed out users */}
         <SignedOut>
-          <Container maxWidth="md" sx={{ py: 8 }}>
-            <Paper
-              elevation={8}
-              sx={{
-                p: 6,
-                textAlign: "center",
-                background: "rgba(255, 255, 255, 0.95)",
-                backdropFilter: "blur(20px)",
-                borderRadius: 4,
-              }}
-            >
-              <TranslateIcon
-                sx={{ fontSize: 64, color: "primary.main", mb: 2 }}
-              />
-              <Typography
-                variant="h3"
-                component="h1"
-                gutterBottom
-                sx={{ fontWeight: 700 }}
-              >
-                Welcome to Translation Hub
-              </Typography>
-              <Typography variant="h6" color="text.secondary" sx={{ mb: 4 }}>
-                Manage and track your translation tasks with editorial
-                guidelines
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-                Sign in to access your translation dashboard, create new tasks,
-                and track progress across multiple languages.
-              </Typography>
-              <SignInButton mode="modal">
-                <Button
-                  variant="contained"
-                  size="large"
-                  startIcon={<LoginIcon />}
-                  sx={{
-                    background:
-                      "linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)",
-                    color: "white",
-                    fontWeight: 600,
-                    px: 4,
-                    py: 1.5,
-                    fontSize: "1.1rem",
-                    "&:hover": {
-                      background:
-                        "linear-gradient(45deg, #4f46e5 30%, #7c3aed 90%)",
-                      transform: "translateY(-2px)",
-                    },
-                  }}
-                >
-                  Get Started
-                </Button>
-              </SignInButton>
-            </Paper>
-          </Container>
+          <div className="container mx-auto max-w-2xl py-16 px-4">
+            <Card className="p-8 text-center bg-background/95 backdrop-blur-sm">
+              <CardContent className="space-y-6 p-0">
+                <Languages className="mx-auto h-16 w-16 text-primary" />
+                <div className="space-y-4">
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                    Welcome to Translation Hub
+                  </h1>
+                  <p className="text-lg text-muted-foreground">
+                    Manage and track your translation tasks with editorial guidelines
+                  </p>
+                  <p className="text-muted-foreground">
+                    Sign in to access your translation dashboard, create new tasks,
+                    and track progress across multiple languages.
+                  </p>
+                </div>
+                <SignInButton mode="modal">
+                  <Button 
+                    size="lg" 
+                    className="bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-lg px-8 py-3"
+                  >
+                    <LogIn className="mr-2 h-5 w-5" />
+                    Get Started
+                  </Button>
+                </SignInButton>
+              </CardContent>
+            </Card>
+          </div>
         </SignedOut>
-      </Box>
+      </div>
     </ThemeProvider>
   );
 };

@@ -1,22 +1,15 @@
 import React, { useState } from 'react';
-import {
-  Grid,
-  Paper,
-  Typography,
-  Box,
-  LinearProgress,
-  Chip,
-  Fade,
-  Slide,
-} from '@mui/material';
 import { 
-  HourglassEmpty as PendingIcon,
-  Translate as TranslatingIcon,
-  Psychology as VerificationIcon,
-  Person as ReviewIcon,
-  CheckCircle as DoneIcon,
-  Error as FailedIcon,
-} from '@mui/icons-material';
+  Clock,
+  Languages,
+  Brain,
+  User,
+  CheckCircle,
+  AlertCircle,
+} from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import TaskCard from './TaskCard';
 import TaskDetailsModal from './TaskDetailsModal';
 import { TranslationTask, hasMultipleLanguageStates, getLanguageStatesForTask, TaskCardDisplayInfo, getTaskDisplayInfoForStatus, LanguageTaskStatus } from '../../types';
@@ -30,44 +23,44 @@ const statusColumns = [
   { 
     status: 'pending', 
     title: 'Pending', 
-    color: '#ef4444',
-    gradient: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)',
-    icon: PendingIcon,
+    color: 'destructive',
+    gradient: 'from-red-500 to-red-400',
+    icon: Clock,
   },
   { 
     status: 'translating', 
     title: 'Translating', 
-    color: '#f59e0b',
-    gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-    icon: TranslatingIcon,
+    color: 'orange',
+    gradient: 'from-orange-500 to-amber-400',
+    icon: Languages,
   },
   { 
     status: 'llm_verification', 
     title: 'LLM Verification', 
-    color: '#3b82f6',
-    gradient: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
-    icon: VerificationIcon,
+    color: 'primary',
+    gradient: 'from-blue-500 to-blue-400',
+    icon: Brain,
   },
   { 
     status: 'human_review', 
     title: 'Human Review', 
-    color: '#8b5cf6',
-    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
-    icon: ReviewIcon,
+    color: 'secondary',
+    gradient: 'from-purple-500 to-purple-400',
+    icon: User,
   },
   { 
     status: 'done', 
     title: 'Done', 
-    color: '#10b981',
-    gradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-    icon: DoneIcon,
+    color: 'success',
+    gradient: 'from-green-500 to-emerald-400',
+    icon: CheckCircle,
   },
   { 
     status: 'failed', 
     title: 'Failed', 
-    color: '#6b7280',
-    gradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)',
-    icon: FailedIcon,
+    color: 'outline',
+    gradient: 'from-gray-500 to-gray-400',
+    icon: AlertCircle,
   },
 ];
 
@@ -108,155 +101,81 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
   };
 
   return (
-    <Box>
+    <div className="space-y-6">
       {loading && (
-        <LinearProgress 
-          sx={{ 
-            mb: 3, 
-            borderRadius: 2,
-            height: 6,
-            background: 'rgba(255, 255, 255, 0.2)',
-            '& .MuiLinearProgress-bar': {
-              background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
-              borderRadius: 2,
-            }
-          }} 
-        />
+        <div className="mb-6">
+          <Progress value={100} className="h-2 bg-background/20" />
+        </div>
       )}
       
-      <Grid container spacing={3}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {statusColumns.map((column, index) => {
           const columnDisplayInfos = getTaskDisplayInfosByStatus(column.status);
           const totalLanguageCount = getLanguageCountByStatus(column.status);
           const IconComponent = column.icon;
           
           return (
-            <Grid item xs={12} md={2} key={column.status}>
-              <Slide direction="up" in={true} timeout={300 + index * 100}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 3,
-                    minHeight: '700px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      mb: 3,
-                      pb: 2,
-                      borderBottom: '2px solid rgba(0, 0, 0, 0.05)',
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 40,
-                        height: 40,
-                        borderRadius: 2,
-                        background: column.gradient,
-                        mr: 2,
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                      }}
-                    >
-                      <IconComponent sx={{ color: 'white', fontSize: 20 }} />
-                    </Box>
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography
-                        variant="h6"
-                        sx={{
-                          color: '#1e293b',
-                          fontWeight: 700,
-                          fontSize: '1rem',
-                          mb: 0.5,
-                        }}
-                      >
+            <div key={column.status} className="min-h-[700px]">
+              <Card className="h-full bg-card/90 backdrop-blur-md border border-border/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <CardContent className="p-4 h-full flex flex-col">
+                  {/* Column Header */}
+                  <div className="flex items-center mb-4 pb-3 border-b border-border/50">
+                    <div className={`flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br ${column.gradient} mr-3 shadow-md`}>
+                      <IconComponent className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-foreground mb-1">
                         {column.title}
-                      </Typography>
-                      <Chip
-                        label={`${columnDisplayInfos.length} tasks`}
-                        size="small"
-                        sx={{
-                          background: column.gradient,
-                          color: 'white',
-                          fontWeight: 600,
-                          fontSize: '0.75rem',
-                          height: 24,
-                          '& .MuiChip-label': {
-                            px: 1.5,
-                          },
-                        }}
-                      />
-                      {totalLanguageCount > columnDisplayInfos.length && (
-                        <Chip
-                          label={`${totalLanguageCount} langs`}
-                          size="small"
-                          sx={{
-                            backgroundColor: '#2196f3',
-                            color: 'white',
-                            fontSize: '0.7rem',
-                            ml: 0.5,
-                          }}
-                        />
-                      )}
-                    </Box>
-                  </Box>
+                      </h3>
+                      <div className="flex gap-1">
+                        <Badge variant={column.color as any} className="text-xs px-2">
+                          {columnDisplayInfos.length} tasks
+                        </Badge>
+                        {totalLanguageCount > columnDisplayInfos.length && (
+                          <Badge variant="secondary" className="text-xs px-2">
+                            {totalLanguageCount} langs
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                   
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {/* Column Content */}
+                  <div className="flex-1 space-y-3">
                     {columnDisplayInfos.map((displayInfo, taskIndex) => (
-                      <Fade in={true} timeout={500 + taskIndex * 100} key={`${displayInfo.task.id}-${column.status}`}>
-                        <div>
-                          <TaskCard 
-                            task={displayInfo.task} 
-                            filteredLanguages={displayInfo.filteredLanguages}
-                            isPartialDisplay={displayInfo.isPartialDisplay}
-                            currentColumnStatus={column.status as LanguageTaskStatus}
-                            onClick={() => handleTaskClick(displayInfo.task)} 
-                          />
-                        </div>
-                      </Fade>
+                      <div
+                        key={`${displayInfo.task.id}-${column.status}`}
+                        className="animate-in fade-in duration-300"
+                        style={{ animationDelay: `${taskIndex * 100}ms` }}
+                      >
+                        <TaskCard 
+                          task={displayInfo.task} 
+                          filteredLanguages={displayInfo.filteredLanguages}
+                          isPartialDisplay={displayInfo.isPartialDisplay}
+                          currentColumnStatus={column.status as LanguageTaskStatus}
+                          onClick={() => handleTaskClick(displayInfo.task)} 
+                        />
+                      </div>
                     ))}
                     {columnDisplayInfos.length === 0 && (
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          minHeight: 120,
-                          color: '#64748b',
-                          fontSize: '0.875rem',
-                          fontStyle: 'italic',
-                        }}
-                      >
+                      <div className="flex items-center justify-center min-h-[120px] text-muted-foreground text-sm italic">
                         No tasks in this column
-                      </Box>
+                      </div>
                     )}
-                  </Box>
-                </Paper>
-              </Slide>
-            </Grid>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           );
         })}
-      </Grid>
+      </div>
       
       <TaskDetailsModal
         task={selectedTask}
         open={isModalOpen}
         onClose={handleCloseModal}
       />
-    </Box>
+    </div>
   );
 };
 

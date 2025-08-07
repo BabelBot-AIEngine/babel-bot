@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Prolific Light Theme */
+    --background: 0 0% 98%;
+    --foreground: 224 71% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 14%;
+    --primary: 224 91% 34%; /* Navy blue #003eab */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 270 56% 80%; /* Lilac */
+    --secondary-foreground: 224 71% 14%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 270 56% 95%;
+    --accent-foreground: 224 71% 14%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 224 91% 34%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* Prolific Dark Theme */
+    --background: 224 71% 5%;
+    --foreground: 0 0% 98%;
+    --card: 224 71% 7%;
+    --card-foreground: 0 0% 98%;
+    --popover: 224 71% 7%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 270 56% 70%; /* Lighter lilac for dark mode */
+    --primary-foreground: 224 71% 5%;
+    --secondary: 224 47% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 224 47% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 224 47% 15%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 85% 97%;
+    --border: 224 47% 15%;
+    --input: 224 47% 15%;
+    --ring: 270 56% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

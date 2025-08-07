@@ -1,17 +1,8 @@
 import React from 'react';
-import {
-  Card,
-  CardContent,
-  Typography,
-  Chip,
-  Box,
-  LinearProgress,
-} from '@mui/material';
-import {
-  Language as LanguageIcon,
-  Schedule as ScheduleIcon,
-  Error as ErrorIcon,
-} from '@mui/icons-material';
+import { Languages, Clock, AlertTriangle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { TranslationTask, getLanguageStatesForTask, hasMultipleLanguageStates, LanguageTaskStatus } from '../../types';
 import { getLanguageDisplayName } from '../../utils/languageUtils';
 
@@ -30,31 +21,31 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, filteredLanguages, i
   const getStatusIcon = () => {
     switch (displayStatus) {
       case 'failed':
-        return <ErrorIcon color="error" fontSize="small" />;
+        return <AlertTriangle className="h-4 w-4 text-white" />;
       case 'translating':
       case 'llm_verification':
       case 'human_review':
-        return <ScheduleIcon color="primary" fontSize="small" />;
+        return <Clock className="h-4 w-4 text-white" />;
       default:
-        return <LanguageIcon color="primary" fontSize="small" />;
+        return <Languages className="h-4 w-4 text-white" />;
     }
   };
 
-  const getLanguageStatusColor = (status: LanguageTaskStatus): string => {
+  const getLanguageStatusVariant = (status: LanguageTaskStatus): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
       case 'done':
-        return '#4caf50';
+        return 'default'; // This will be green via CSS variables
       case 'failed':
-        return '#f44336';
+        return 'destructive';
       case 'human_review':
-        return '#ff9800';
+        return 'secondary';
       case 'llm_verification':
-        return '#2196f3';
+        return 'default';
       case 'translating':
-        return '#9c27b0';
+        return 'secondary';
       case 'pending':
       default:
-        return '#757575';
+        return 'outline';
     }
   };
 
@@ -62,255 +53,141 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, filteredLanguages, i
   const hasSplitStates = hasMultipleLanguageStates(task);
   const displayLanguages = filteredLanguages || task.destinationLanguages;
 
-  const getStatusGradient = () => {
+  const getStatusGradientClass = () => {
     switch (displayStatus) {
       case 'pending':
-        return 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)';
+        return 'from-red-500 to-red-400';
       case 'translating':
-        return 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)';
+        return 'from-orange-500 to-amber-400';
       case 'llm_verification':
-        return 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)';
+        return 'from-blue-500 to-blue-400';
       case 'human_review':
-        return 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)';
+        return 'from-purple-500 to-purple-400';
       case 'done':
-        return 'linear-gradient(135deg, #10b981 0%, #34d399 100%)';
+        return 'from-green-500 to-emerald-400';
       case 'failed':
-        return 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)';
+        return 'from-red-500 to-red-400';
       default:
-        return 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)';
+        return 'from-gray-500 to-gray-400';
     }
   };
 
   return (
-    <Card
-      elevation={0}
+    <Card 
+      className="bg-card/80 backdrop-blur-sm border border-border/30 cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:scale-[1.02] relative overflow-hidden group"
       onClick={onClick}
-      sx={{
-        background: 'rgba(255, 255, 255, 0.8)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.3)',
-        borderRadius: 2.5,
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        cursor: 'pointer',
-        position: 'relative',
-        overflow: 'hidden',
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 3,
-          background: getStatusGradient(),
-        },
-        '&:hover': {
-          transform: 'translateY(-4px) scale(1.02)',
-          boxShadow: '0 12px 24px rgba(0, 0, 0, 0.15)',
-          background: 'rgba(255, 255, 255, 0.95)',
-        },
-      }}
     >
-      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 32,
-              height: 32,
-              borderRadius: 1.5,
-              background: getStatusGradient(),
-              mr: 1.5,
-              boxShadow: '0 4px 8px rgba(0, 0, 0, 0.12)',
-            }}
-          >
-            {React.cloneElement(getStatusIcon(), { 
-              sx: { color: 'white', fontSize: 16 } 
-            })}
-          </Box>
-          <Typography
-            variant="body2"
-            sx={{ 
-              fontWeight: 700, 
-              flexGrow: 1,
-              fontSize: '0.875rem',
-              color: '#1e293b',
-            }}
-          >
-            {task.id.split('_')[1]}
-            {isPartialDisplay && (
-              <Chip
-                label="PARTIAL"
-                size="small"
-                sx={{
-                  ml: 1,
-                  height: 16,
-                  fontSize: '0.6rem',
-                  backgroundColor: '#ff5722',
-                  color: 'white',
-                }}
-              />
-            )}
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              color: '#64748b',
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              opacity: 0.8,
-            }}
-          >
-            Click for details
-          </Typography>
-        </Box>
+      {/* Status indicator bar at top */}
+      <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${getStatusGradientClass()}`} />
+      <CardContent className="p-4">
+        {/* Header section */}
+        <div className="flex items-center mb-3">
+          <div className={`flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br ${getStatusGradientClass()} mr-3 shadow-sm`}>
+            {getStatusIcon()}
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-foreground">
+                {task.id.split('_')[1]}
+              </span>
+              {isPartialDisplay && (
+                <Badge variant="destructive" className="text-xs px-1 h-5">
+                  PARTIAL
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Click for details
+            </p>
+          </div>
+        </div>
 
-        <Typography
-          variant="body2"
-          sx={{
-            mb: 2,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            color: '#374151',
-            fontSize: '0.875rem',
-            lineHeight: 1.5,
-            fontWeight: 500,
-          }}
-        >
+        {/* Content preview */}
+        <p className="text-sm text-foreground/80 mb-3 overflow-hidden line-clamp-2 leading-relaxed font-medium">
           {task.mediaArticle.title || task.mediaArticle.text.substring(0, 60) + '...'}
-        </Typography>
+        </p>
+        {/* Detailed language status for partial display */}
         {task.result && isPartialDisplay && (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
-                <strong>Languages in {displayStatus}:</strong> {displayLanguages.length}
-              </Typography>
-              <Box sx={{ mt: 1 }}>
-                {task.result.translations
-                  .filter(translation => displayLanguages.includes(translation.language))
-                  .map((translation, index) => (
-                    <Box key={index} sx={{ mb: 1, p: 1, backgroundColor: '#f8f9fa', borderRadius: 1 }}>
-                      <Typography variant="caption" sx={{ display: 'block' }}>
-                        <strong>{getLanguageDisplayName(translation.language)}:</strong>
-                        <Chip
-                          label={translation.status || displayStatus}
-                          size="small"
-                          sx={{
-                            ml: 1,
-                            height: 16,
-                            fontSize: '0.6rem',
-                            backgroundColor: getLanguageStatusColor(translation.status || displayStatus),
-                            color: 'white',
-                          }}
-                        />
-                      </Typography>
-                      {translation.complianceScore && (
-                        <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
-                          Score: {translation.complianceScore}%
-                        </Typography>
-                      )}
-                    </Box>
-                  ))}
-              </Box>
-            </Box>
-          )}
-          {task.result && !isPartialDisplay && (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="caption" sx={{ display: 'block', mb: 1 }}>
-                <strong>Translations:</strong> {task.result.translations.length}
-              </Typography>
-            </Box>
-          )}
-        
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+          <div className="mb-3">
+            <p className="text-xs text-muted-foreground mb-2">
+              <strong>Languages in {displayStatus}:</strong> {displayLanguages.length}
+            </p>
+            <div className="space-y-2">
+              {task.result.translations
+                .filter(translation => displayLanguages.includes(translation.language))
+                .map((translation, index) => (
+                  <div key={index} className="p-2 bg-muted/50 rounded-md">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold">{getLanguageDisplayName(translation.language)}</span>
+                      <Badge 
+                        variant={getLanguageStatusVariant(translation.status || displayStatus)} 
+                        className="text-xs px-1 h-4"
+                      >
+                        {translation.status || displayStatus}
+                      </Badge>
+                    </div>
+                    {translation.complianceScore && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Score: {translation.complianceScore}%
+                      </p>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* Simple translation count for full display */}
+        {task.result && !isPartialDisplay && (
+          <div className="mb-3">
+            <p className="text-xs text-muted-foreground">
+              <strong>Translations:</strong> {task.result.translations.length}
+            </p>
+          </div>
+        )}
+        {/* Language chips */}
+        <div className="flex flex-wrap gap-1 mb-3">
           {displayLanguages.slice(0, 3).map(lang => {
             const langStatus = languageStates.get(lang) || displayStatus;
-            const statusColor = getLanguageStatusColor(langStatus);
             return (
-              <Chip
+              <Badge
                 key={lang}
-                label={getLanguageDisplayName(lang)}
-                size="small"
-                variant={isPartialDisplay ? "filled" : "outlined"}
-                sx={{ 
-                  fontSize: '0.7rem',
-                  ...(isPartialDisplay && {
-                    backgroundColor: statusColor,
-                    color: 'white',
-                    '&:hover': {
-                      backgroundColor: statusColor,
-                      opacity: 0.8,
-                    }
-                  })
-                }}
-              />
+                variant={isPartialDisplay ? getLanguageStatusVariant(langStatus) : "outline"}
+                className="text-xs px-2 h-5"
+              >
+                {getLanguageDisplayName(lang)}
+              </Badge>
             );
           })}
           {displayLanguages.length > 3 && (
-            <Chip
-              label={`+${displayLanguages.length - 3}`}
-              size="small"
-              sx={{ 
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                background: getStatusGradient(),
-                color: 'white',
-              }}
-            />
+            <Badge className={`text-xs px-2 h-5 bg-gradient-to-r ${getStatusGradientClass()} text-white border-0`}>
+              +{displayLanguages.length - 3}
+            </Badge>
           )}
-        </Box>
+        </div>
 
+        {/* Progress bar for active statuses */}
         {(displayStatus === 'translating' || displayStatus === 'llm_verification' || displayStatus === 'human_review') && (
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                Progress
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#1e293b', fontWeight: 700 }}>
-                {task.progress || 0}%
-              </Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={task.progress || 0}
-              sx={{ 
-                height: 6, 
-                borderRadius: 3,
-                background: 'rgba(0, 0, 0, 0.06)',
-                '& .MuiLinearProgress-bar': {
-                  background: getStatusGradient(),
-                  borderRadius: 3,
-                },
-              }}
+          <div className="mb-3">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs text-muted-foreground font-semibold">Progress</span>
+              <span className="text-xs text-foreground font-bold">{task.progress || 0}%</span>
+            </div>
+            <Progress 
+              value={task.progress || 0} 
+              className="h-1.5"
             />
-          </Box>
+          </div>
         )}
 
+        {/* Error state */}
         {task.error && (
-          <Box
-            sx={{
-              p: 1.5,
-              background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
-              border: '1px solid #fecaca',
-              borderRadius: 1.5,
-            }}
-          >
-            <Typography
-              variant="caption"
-              sx={{ 
-                color: '#dc2626',
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <ErrorIcon sx={{ fontSize: 14, mr: 0.5 }} />
+          <div className="p-3 bg-gradient-to-r from-destructive/10 to-destructive/5 border border-destructive/20 rounded-lg">
+            <div className="flex items-center text-destructive text-xs font-semibold">
+              <AlertTriangle className="h-3 w-3 mr-1" />
               Error occurred
-            </Typography>
-          </Box>
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
