@@ -510,9 +510,9 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
           </IconButton>
         </Box>
 
-        {task.mediaArticle.title && (
+        {task.mediaArticle?.title && (
           <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 500 }}>
-            {task.mediaArticle.title}
+            {task.mediaArticle?.title}
           </Typography>
         )}
       </Box>
@@ -822,7 +822,10 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                         Original Article
                       </Typography>
                       <IconButton
-                        onClick={() => copyToClipboard(task.mediaArticle.text)}
+                        onClick={() =>
+                          task.mediaArticle?.text &&
+                          copyToClipboard(task.mediaArticle.text)
+                        }
                         sx={{
                           background: "rgba(99, 102, 241, 0.1)",
                           "&:hover": {
@@ -852,7 +855,8 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({
                           whiteSpace: "pre-wrap",
                         }}
                       >
-                        {task.mediaArticle.text}
+                        {task.mediaArticle?.text ||
+                          "No article content available"}
                       </Typography>
                     </Box>
                   </CardContent>

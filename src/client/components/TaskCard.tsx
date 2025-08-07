@@ -435,8 +435,10 @@ const TaskCard: React.FC<TaskCardProps> = ({
             fontWeight: 500,
           }}
         >
-          {task.mediaArticle.title ||
-            task.mediaArticle.text.substring(0, 60) + "..."}
+          {task.mediaArticle?.title ??
+            (task.mediaArticle?.text
+              ? task.mediaArticle.text.substring(0, 60) + "..."
+              : `Task ${task.id.split("_")[1]}`)}
         </Typography>
         {getAvailableTranslations(task).length > 0 && isPartialDisplay && (
           <Box sx={{ mt: 1 }}>
