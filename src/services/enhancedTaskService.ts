@@ -354,20 +354,7 @@ export class EnhancedTaskService {
       `Handling subtask.translation.completed for ${payload.data.language} in task ${payload.taskId}`
     );
 
-    // Start LLM verification
-    const verificationStartedEvent: LLMVerificationStartedEvent = {
-      event: "subtask.llm_verification.started",
-      taskId: payload.taskId,
-      subTaskId: payload.subTaskId,
-      timestamp: Date.now(),
-      data: {
-        language: payload.data.language,
-        status: "llm_verifying",
-        currentIteration: payload.data.currentIteration,
-        verificationType: "initial",
-      },
-    };
-
+    // Move directly into verification within this process to avoid extra webhook hop
     await this.dbService.updateLanguageSubTask(
       payload.taskId,
       payload.data.language,
@@ -376,7 +363,102 @@ export class EnhancedTaskService {
       }
     );
 
-    await this.sendWebhook(verificationStartedEvent);
+    const task = await this.dbService.getEnhancedTask(payload.taskId);
+    if (!task) {
+      throw new Error(`Task ${payload.taskId} not found`);
+    }
+
+    const subTask = task.languageSubTasks[payload.data.language];
+    if (!subTask || !subTask.translatedText) {
+      throw new Error(
+        `No translation found for ${payload.data.language} in task ${payload.taskId}`
+      );
+    }
+
+    try {
+      // Perform LLM verification inline
+      const reviewResult = await this.reviewService.reviewAgainstGuidelines(
+        subTask.translatedText,
+        task.editorialGuidelines,
+        task.mediaArticle.text
+      );
+
+      const verificationScore = reviewResult.score / 20; // Convert to 5-point scale
+      const needsHumanReview = verificationScore < task.confidenceThreshold;
+
+      // Update sub-task status
+      await this.dbService.updateLanguageSubTask(
+        payload.taskId,
+        payload.data.language,
+        {
+          status: "llm_verified",
+        }
+      );
+
+      // Create or update iteration record (iteration number from payload)
+      const iteration: ReviewIteration = {
+        iterationNumber: payload.data.currentIteration,
+        startedAt: new Date().toISOString(),
+        llmVerification: {
+          score: verificationScore,
+          feedback: reviewResult.notes.join("; "),
+          confidence: verificationScore,
+          completedAt: new Date().toISOString(),
+        },
+      };
+
+      await this.dbService.addIterationToLanguageSubTask(
+        payload.taskId,
+        payload.data.language,
+        iteration
+      );
+
+      if (needsHumanReview) {
+        // Mark as ready for human review and trigger batching shortly
+        await this.dbService.updateLanguageSubTask(
+          payload.taskId,
+          payload.data.language,
+          {
+            status: "review_ready",
+          }
+        );
+
+        setTimeout(async () => {
+          try {
+            await this.batchManager.processReadyLanguageSubTasks();
+          } catch (error) {
+            console.error("Error processing ready language sub-tasks:", error);
+          }
+        }, 1000);
+      } else {
+        // Score is sufficient, finalize this language
+        await this.finalizeLanguageSubTask(
+          payload.taskId,
+          payload.data.language,
+          verificationScore,
+          "threshold_met"
+        );
+      }
+    } catch (error) {
+      console.error(
+        `Inline LLM verification failed for ${payload.data.language} in task ${payload.taskId}:`,
+        error
+      );
+
+      await this.dbService.updateLanguageSubTask(
+        payload.taskId,
+        payload.data.language,
+        {
+          status: "failed",
+        }
+      );
+
+      await this.handleLanguageSubTaskFailed(
+        payload.taskId,
+        payload.data.language,
+        error
+      );
+    }
   }
 
   async handleLLMVerificationStarted(
