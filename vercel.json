@@ -6,21 +6,6 @@
     "api/webhooks/index.ts": {
       "maxDuration": 30
     },
-    "api/webhook/[state]/[taskId].ts": {
-      "maxDuration": 30
-    },
-    "api/state/translate.ts": {
-      "maxDuration": 30
-    },
-    "api/state/verify.ts": {
-      "maxDuration": 30
-    },
-    "api/state/review.ts": {
-      "maxDuration": 30
-    },
-    "api/state/finalize.ts": {
-      "maxDuration": 30
-    },
     "api/tasks/enhanced/[taskId]/retrigger-webhook.ts": {
       "maxDuration": 30
     }
@@ -32,24 +17,16 @@
       "destination": "/api/webhooks/index.ts"
     },
     {
-      "source": "/api/webhook/:state/:taskId",
-      "destination": "/api/webhook/[state]/[taskId].ts"
+      "source": "/api/webhooks/:state/:taskId",
+      "destination": "/api/webhooks/index.ts"
     },
     {
-      "source": "/api/state/translate",
-      "destination": "/api/state/translate.ts"
+      "source": "/api/webhooks/:state/:taskId/:language",
+      "destination": "/api/webhooks/index.ts"
     },
     {
-      "source": "/api/state/verify",
-      "destination": "/api/state/verify.ts"
-    },
-    {
-      "source": "/api/state/review",
-      "destination": "/api/state/review.ts"
-    },
-    {
-      "source": "/api/state/finalize",
-      "destination": "/api/state/finalize.ts"
+      "source": "/api/webhooks/:state/:taskId/:language/:iteration",
+      "destination": "/api/webhooks/index.ts"
     },
     {
       "source": "/api/tasks/enhanced/([^/]+)/retrigger-webhook",

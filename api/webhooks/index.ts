@@ -244,6 +244,12 @@ async function handleBabelWebhook(
   }
   console.log("[WEBHOOK-ENDPOINT] ✅ Payload structure validated");
 
+  // If this is already a granular path (/api/webhooks/:state/:taskId/...), process directly
+  const requestPath = (req.url || "").split("?")[0];
+  const granularMatch = requestPath.match(
+    /^\/api\/webhooks\/([a-z_]+)\/([^/]+)(?:\/([^/]+))?(?:\/([^/]+))?$/
+  );
+
   // Respond immediately to acknowledge receipt
   console.log("[WEBHOOK-ENDPOINT] 📤 Sending immediate 200 OK response");
   res.status(200).json({
@@ -259,8 +265,13 @@ async function handleBabelWebhook(
   waitUntil(
     (async () => {
       try {
-        // Forward to state-specific endpoint to break perceived self-loop
-        await forwardToStateEndpoint(body);
+        if (granularMatch) {
+          // Already granular; process payload
+          await BabelWebhookHandler.handleWebhook(body);
+        } else {
+          // Forward to granular path to break perceived self-loop
+          await forwardToGranularPath(body);
+        }
         console.log(
           "[WEBHOOK-ENDPOINT] ✅ Async webhook processing completed successfully"
         );
@@ -276,35 +287,33 @@ async function handleBabelWebhook(
   );
 }
 
-async function forwardToStateEndpoint(body: any): Promise<void> {
+async function forwardToGranularPath(body: any): Promise<void> {
   const event: string | undefined = body?.event;
   if (!event) return;
-  let path: string | undefined;
+  let state: string | undefined;
   switch (event) {
     // translate state
     case "task.created":
     case "language_subtask.created":
     case "subtask.translation.started":
-      path = "/api/state/translate";
+      state = "translate";
       break;
     // verify state
     case "subtask.translation.completed":
     case "subtask.llm_verification.started":
-      path = "/api/state/verify";
+      state = "verify";
       break;
     case "subtask.llm_verification.completed": {
       const needsHumanReview = !!body?.data?.needsHumanReview;
-      path = needsHumanReview ? "/api/state/review" : "/api/state/finalize";
+      state = needsHumanReview ? "review" : "finalize";
       break;
     }
     case "subtask.llm_reverification.started":
-      path = "/api/state/verify";
+      state = "verify";
       break;
     case "subtask.llm_reverification.completed": {
       const needsAnotherIteration = !!body?.data?.needsAnotherIteration;
-      path = needsAnotherIteration
-        ? "/api/state/review"
-        : "/api/state/finalize";
+      state = needsAnotherIteration ? "review" : "finalize";
       break;
     }
     // review state
@@ -313,17 +322,17 @@ async function forwardToStateEndpoint(body: any): Promise<void> {
     case "prolific_study.published":
     case "prolific_results.received":
     case "subtask.iteration.continuing":
-      path = "/api/state/review";
+      state = "review";
       break;
     // finalize state
     case "subtask.finalized":
     case "task.completed":
-      path = "/api/state/finalize";
+      state = "finalize";
       break;
     default:
-      path = undefined;
+      state = undefined;
   }
-  if (!path) {
+  if (!state) {
     // Fallback to direct handler for unknown events
     await BabelWebhookHandler.handleWebhook(body);
     return;
@@ -333,10 +342,14 @@ async function forwardToStateEndpoint(body: any): Promise<void> {
   const baseUrl = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
     : `${process.env.BASE_URL || "http://localhost:3000"}`;
-  const url = `${baseUrl}${path.replace(
-    "/api/state/",
-    "/api/webhook/"
-  )}/${encodeURIComponent(body?.taskId || "unknown")}`;
+  const taskId = encodeURIComponent(body?.taskId || "unknown");
+  const lang = body?.data?.language
+    ? `/${encodeURIComponent(body.data.language)}`
+    : "";
+  const iter = body?.data?.currentIteration
+    ? `/${encodeURIComponent(body.data.currentIteration)}`
+    : "";
+  const url = `${baseUrl}/api/webhooks/${state}/${taskId}${lang}${iter}`;
 
   // Re-sign the body for internal hop
   const secret = process.env.BABEL_WEBHOOK_SECRET!;

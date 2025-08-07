@@ -680,9 +680,9 @@ export class EnhancedTaskService {
 
     try {
       const startTime = Date.now();
-      const dynamicPath = this.mapEventToStatePath(event.event, event.taskId);
-      const destinationUrl = dynamicPath
-        ? this.buildAbsoluteUrl(dynamicPath)
+      const granularPath = this.mapEventToGranularWebhookPath(event);
+      const destinationUrl = granularPath
+        ? this.buildAbsoluteUrl(granularPath)
         : this.webhookUrl;
 
       console.log(`[ENHANCED-WEBHOOK] ➡️ Sending webhook to ${destinationUrl}`);
@@ -770,44 +770,43 @@ export class EnhancedTaskService {
     return `${base}${path}`;
   }
 
-  private mapEventToStatePath(
-    eventType: string,
-    taskId: string
-  ): string | null {
+  private mapEventToGranularWebhookPath(event: any): string | null {
     const enc = encodeURIComponent;
-    switch (eventType) {
-      // translate state
-      case "task.created":
-      case "language_subtask.created":
-      case "subtask.translation.started":
-        return `/api/webhook/translate/${enc(taskId)}`;
-      // verify state
-      case "subtask.translation.completed":
-      case "subtask.llm_verification.started":
-        return `/api/webhook/verify/${enc(taskId)}`;
-      case "subtask.llm_verification.completed":
-        // Decision to finalize vs review is taken in forwarder, but we still route via verify state hop
-        return `/api/webhook/verify/${enc(taskId)}`;
-      // review state
-      case "review_batch.created":
-      case "prolific_study.created":
-      case "prolific_study.published":
-      case "prolific_results.received":
-      case "subtask.iteration.continuing":
-      case "task.human_review.started":
-      case "task.human_review.completed":
-        return `/api/webhook/review/${enc(taskId)}`;
-      // re-verify (post-human) still treated as verify hop
-      case "subtask.llm_reverification.started":
-      case "subtask.llm_reverification.completed":
-        return `/api/webhook/verify/${enc(taskId)}`;
-      // finalize
-      case "subtask.finalized":
-      case "task.completed":
-        return `/api/webhook/finalize/${enc(taskId)}`;
-      default:
-        return null;
-    }
+    const taskId = event.taskId;
+    const language = event.data?.language;
+    const iteration = event.data?.currentIteration;
+    const state = (() => {
+      switch (event.event) {
+        case "task.created":
+        case "language_subtask.created":
+        case "subtask.translation.started":
+          return "translate";
+        case "subtask.translation.completed":
+        case "subtask.llm_verification.started":
+        case "subtask.llm_verification.completed":
+        case "subtask.llm_reverification.started":
+        case "subtask.llm_reverification.completed":
+          return "verify";
+        case "review_batch.created":
+        case "prolific_study.created":
+        case "prolific_study.published":
+        case "prolific_results.received":
+        case "subtask.iteration.continuing":
+        case "task.human_review.started":
+        case "task.human_review.completed":
+          return "review";
+        case "subtask.finalized":
+        case "task.completed":
+          return "finalize";
+        default:
+          return null;
+      }
+    })();
+
+    if (!state || !taskId) return null;
+    const langPart = language ? `/${enc(language)}` : "";
+    const iterPart = iteration ? `/${enc(iteration)}` : "";
+    return `/api/webhooks/${state}/${enc(taskId)}${langPart}${iterPart}`;
   }
 
   // Utility methods
