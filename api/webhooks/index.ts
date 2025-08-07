@@ -333,7 +333,10 @@ async function forwardToStateEndpoint(body: any): Promise<void> {
   const baseUrl = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
     : `${process.env.BASE_URL || "http://localhost:3000"}`;
-  const url = `${baseUrl}${path}`;
+  const url = `${baseUrl}${path.replace(
+    "/api/state/",
+    "/api/webhook/"
+  )}/${encodeURIComponent(body?.taskId || "unknown")}`;
 
   // Re-sign the body for internal hop
   const secret = process.env.BABEL_WEBHOOK_SECRET!;

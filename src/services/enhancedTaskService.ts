@@ -671,7 +671,7 @@ export class EnhancedTaskService {
 
   private async sendWebhook(event: any): Promise<void> {
     console.log(
-      `[ENHANCED-WEBHOOK] 📡 Sending webhook: ${event.event} to ${this.webhookUrl}`
+      `[ENHANCED-WEBHOOK] 📡 Preparing webhook: ${event.event} for task ${event.taskId}`
     );
     console.log(
       `[ENHANCED-WEBHOOK] Event payload:`,
@@ -680,8 +680,15 @@ export class EnhancedTaskService {
 
     try {
       const startTime = Date.now();
+      const dynamicPath = this.mapEventToStatePath(event.event, event.taskId);
+      const destinationUrl = dynamicPath
+        ? this.buildAbsoluteUrl(dynamicPath)
+        : this.webhookUrl;
+
+      console.log(`[ENHANCED-WEBHOOK] ➡️ Sending webhook to ${destinationUrl}`);
+
       await WebhookSender.sendBabelWebhook(
-        this.webhookUrl,
+        destinationUrl,
         event,
         this.webhookSecret
       );
@@ -694,7 +701,7 @@ export class EnhancedTaskService {
       if (event.taskId) {
         await this.dbService.addWebhookAttempt(event.taskId, {
           eventType: event.event,
-          url: this.webhookUrl,
+          url: destinationUrl,
           attempt: 1,
           status: "success",
           createdAt: new Date().toISOString(),
@@ -753,6 +760,53 @@ export class EnhancedTaskService {
       // For non-quota errors, still throw to maintain error visibility
       // but consider if we want to be more permissive here
       throw error;
+    }
+  }
+
+  private buildAbsoluteUrl(path: string): string {
+    const base = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : `${process.env.BASE_URL || "http://localhost:3000"}`;
+    return `${base}${path}`;
+  }
+
+  private mapEventToStatePath(
+    eventType: string,
+    taskId: string
+  ): string | null {
+    const enc = encodeURIComponent;
+    switch (eventType) {
+      // translate state
+      case "task.created":
+      case "language_subtask.created":
+      case "subtask.translation.started":
+        return `/api/webhook/translate/${enc(taskId)}`;
+      // verify state
+      case "subtask.translation.completed":
+      case "subtask.llm_verification.started":
+        return `/api/webhook/verify/${enc(taskId)}`;
+      case "subtask.llm_verification.completed":
+        // Decision to finalize vs review is taken in forwarder, but we still route via verify state hop
+        return `/api/webhook/verify/${enc(taskId)}`;
+      // review state
+      case "review_batch.created":
+      case "prolific_study.created":
+      case "prolific_study.published":
+      case "prolific_results.received":
+      case "subtask.iteration.continuing":
+      case "task.human_review.started":
+      case "task.human_review.completed":
+        return `/api/webhook/review/${enc(taskId)}`;
+      // re-verify (post-human) still treated as verify hop
+      case "subtask.llm_reverification.started":
+      case "subtask.llm_reverification.completed":
+        return `/api/webhook/verify/${enc(taskId)}`;
+      // finalize
+      case "subtask.finalized":
+      case "task.completed":
+        return `/api/webhook/finalize/${enc(taskId)}`;
+      default:
+        return null;
     }
   }
 

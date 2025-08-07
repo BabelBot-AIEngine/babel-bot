@@ -6,6 +6,9 @@
     "api/webhooks/index.ts": {
       "maxDuration": 30
     },
+    "api/webhook/[state]/[taskId].ts": {
+      "maxDuration": 30
+    },
     "api/state/translate.ts": {
       "maxDuration": 30
     },
@@ -27,6 +30,10 @@
     {
       "source": "/api/webhooks",
       "destination": "/api/webhooks/index.ts"
+    },
+    {
+      "source": "/api/webhook/(.*)/(.*)",
+      "destination": "/api/webhook/[state]/[taskId].ts"
     },
     {
       "source": "/api/state/translate",
