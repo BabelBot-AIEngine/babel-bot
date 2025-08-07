@@ -32,7 +32,7 @@
       "destination": "/api/webhooks/index.ts"
     },
     {
-      "source": "/api/webhook/(.*)/(.*)",
+      "source": "/api/webhook/:state/:taskId",
       "destination": "/api/webhook/[state]/[taskId].ts"
     },
     {
