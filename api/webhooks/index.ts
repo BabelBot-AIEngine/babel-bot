@@ -265,7 +265,12 @@ async function handleBabelWebhook(
   waitUntil(
     (async () => {
       try {
-        if (granularMatch) {
+        const disableSelfForward =
+          (
+            process.env.BABEL_WEBHOOK_DISABLE_SELF_FORWARD || "false"
+          ).toLowerCase() === "true";
+
+        if (granularMatch || disableSelfForward) {
           // Already granular; process payload
           await BabelWebhookHandler.handleWebhook(body);
         } else {

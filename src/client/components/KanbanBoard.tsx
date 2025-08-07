@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Grid,
   Paper,
@@ -8,18 +8,25 @@ import {
   Chip,
   Fade,
   Slide,
-} from '@mui/material';
-import { 
+} from "@mui/material";
+import {
   HourglassEmpty as PendingIcon,
   Translate as TranslatingIcon,
   Psychology as VerificationIcon,
   Person as ReviewIcon,
   CheckCircle as DoneIcon,
   Error as FailedIcon,
-} from '@mui/icons-material';
-import TaskCard from './TaskCard';
-import TaskDetailsModal from './TaskDetailsModal';
-import { TranslationTask, hasMultipleLanguageStates, getLanguageStatesForTask, TaskCardDisplayInfo, getTaskDisplayInfoForStatus, LanguageTaskStatus } from '../../types';
+} from "@mui/icons-material";
+import TaskCard from "./TaskCard";
+import TaskDetailsModal from "./TaskDetailsModal";
+import {
+  TranslationTask,
+  hasMultipleLanguageStates,
+  getLanguageStatesForTask,
+  TaskCardDisplayInfo,
+  getTaskDisplayInfoForStatus,
+  LanguageTaskStatus,
+} from "../../types";
 
 interface KanbanBoardProps {
   tasks: TranslationTask[];
@@ -27,78 +34,96 @@ interface KanbanBoardProps {
 }
 
 const statusColumns = [
-  { 
-    status: 'pending', 
-    title: 'Pending', 
-    color: '#ef4444',
-    gradient: 'linear-gradient(135deg, #ef4444 0%, #f87171 100%)',
+  {
+    status: "pending",
+    title: "Pending",
+    color: "#ef4444",
+    gradient: "linear-gradient(135deg, #ef4444 0%, #f87171 100%)",
     icon: PendingIcon,
   },
-  { 
-    status: 'translating', 
-    title: 'Translating', 
-    color: '#f59e0b',
-    gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+  {
+    status: "translating",
+    title: "Translating",
+    color: "#f59e0b",
+    gradient: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)",
     icon: TranslatingIcon,
   },
-  { 
-    status: 'llm_verification', 
-    title: 'LLM Verification', 
-    color: '#3b82f6',
-    gradient: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)',
+  {
+    status: "llm_verification",
+    title: "LLM Verification",
+    color: "#3b82f6",
+    gradient: "linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)",
     icon: VerificationIcon,
   },
-  { 
-    status: 'human_review', 
-    title: 'Human Review', 
-    color: '#8b5cf6',
-    gradient: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
+  {
+    status: "human_review",
+    title: "Human Review",
+    color: "#8b5cf6",
+    gradient: "linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)",
     icon: ReviewIcon,
   },
-  { 
-    status: 'done', 
-    title: 'Done', 
-    color: '#10b981',
-    gradient: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+  {
+    status: "done",
+    title: "Done",
+    color: "#10b981",
+    gradient: "linear-gradient(135deg, #10b981 0%, #34d399 100%)",
     icon: DoneIcon,
   },
-  { 
-    status: 'failed', 
-    title: 'Failed', 
-    color: '#6b7280',
-    gradient: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)',
+  {
+    status: "failed",
+    title: "Failed",
+    color: "#6b7280",
+    gradient: "linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)",
     icon: FailedIcon,
   },
 ];
 
 const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
-  const [selectedTask, setSelectedTask] = useState<TranslationTask | null>(null);
+  const [selectedTask, setSelectedTask] = useState<TranslationTask | null>(
+    null
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const getTaskDisplayInfosByStatus = (status: string): TaskCardDisplayInfo[] => {
+  const getTaskDisplayInfosByStatus = (
+    status: string
+  ): TaskCardDisplayInfo[] => {
     const displayInfos: TaskCardDisplayInfo[] = [];
-    
-    tasks.forEach(task => {
-      const displayInfo = getTaskDisplayInfoForStatus(task, status as LanguageTaskStatus);
+
+    tasks.forEach((task) => {
+      const displayInfo = getTaskDisplayInfoForStatus(
+        task,
+        status as LanguageTaskStatus
+      );
       if (displayInfo) {
         displayInfos.push(displayInfo);
       }
     });
-    
+
     return displayInfos;
   };
 
   const getLanguageCountByStatus = (status: string) => {
     let count = 0;
     const displayInfos = getTaskDisplayInfosByStatus(status);
-    displayInfos.forEach(info => {
+    displayInfos.forEach((info) => {
       count += info.filteredLanguages.length;
     });
     return count;
   };
-  
-  const handleTaskClick = (task: TranslationTask) => {
-    setSelectedTask(task);
+
+  const handleTaskClick = async (task: TranslationTask) => {
+    // Fetch full task details on open in case we are using summary list
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedTask(data.task as TranslationTask);
+      } else {
+        setSelectedTask(task);
+      }
+    } catch {
+      setSelectedTask(task);
+    }
     setIsModalOpen(true);
   };
 
@@ -110,26 +135,26 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
   return (
     <Box>
       {loading && (
-        <LinearProgress 
-          sx={{ 
-            mb: 3, 
+        <LinearProgress
+          sx={{
+            mb: 3,
             borderRadius: 2,
             height: 6,
-            background: 'rgba(255, 255, 255, 0.2)',
-            '& .MuiLinearProgress-bar': {
-              background: 'linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)',
+            background: "rgba(255, 255, 255, 0.2)",
+            "& .MuiLinearProgress-bar": {
+              background: "linear-gradient(45deg, #6366f1 30%, #8b5cf6 90%)",
               borderRadius: 2,
-            }
-          }} 
+            },
+          }}
         />
       )}
-      
+
       <Grid container spacing={3}>
         {statusColumns.map((column, index) => {
           const columnDisplayInfos = getTaskDisplayInfosByStatus(column.status);
           const totalLanguageCount = getLanguageCountByStatus(column.status);
           const IconComponent = column.icon;
-          
+
           return (
             <Grid item xs={12} md={2} key={column.status}>
               <Slide direction="up" in={true} timeout={300 + index * 100}>
@@ -137,49 +162,49 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
                   elevation={0}
                   sx={{
                     p: 3,
-                    minHeight: '700px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    minHeight: "700px",
+                    background: "rgba(255, 255, 255, 0.9)",
+                    backdropFilter: "blur(20px)",
+                    border: "1px solid rgba(255, 255, 255, 0.2)",
                     borderRadius: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
+                    transition: "all 0.3s ease",
+                    "&:hover": {
+                      transform: "translateY(-2px)",
+                      boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)",
                     },
                   }}
                 >
                   <Box
                     sx={{
-                      display: 'flex',
-                      alignItems: 'center',
+                      display: "flex",
+                      alignItems: "center",
                       mb: 3,
                       pb: 2,
-                      borderBottom: '2px solid rgba(0, 0, 0, 0.05)',
+                      borderBottom: "2px solid rgba(0, 0, 0, 0.05)",
                     }}
                   >
                     <Box
                       sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                         width: 40,
                         height: 40,
                         borderRadius: 2,
                         background: column.gradient,
                         mr: 2,
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
                       }}
                     >
-                      <IconComponent sx={{ color: 'white', fontSize: 20 }} />
+                      <IconComponent sx={{ color: "white", fontSize: 20 }} />
                     </Box>
                     <Box sx={{ flexGrow: 1 }}>
                       <Typography
                         variant="h6"
                         sx={{
-                          color: '#1e293b',
+                          color: "#1e293b",
                           fontWeight: 700,
-                          fontSize: '1rem',
+                          fontSize: "1rem",
                           mb: 0.5,
                         }}
                       >
@@ -190,11 +215,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
                         size="small"
                         sx={{
                           background: column.gradient,
-                          color: 'white',
+                          color: "white",
                           fontWeight: 600,
-                          fontSize: '0.75rem',
+                          fontSize: "0.75rem",
                           height: 24,
-                          '& .MuiChip-label': {
+                          "& .MuiChip-label": {
                             px: 1.5,
                           },
                         }}
@@ -204,26 +229,34 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
                           label={`${totalLanguageCount} langs`}
                           size="small"
                           sx={{
-                            backgroundColor: '#2196f3',
-                            color: 'white',
-                            fontSize: '0.7rem',
+                            backgroundColor: "#2196f3",
+                            color: "white",
+                            fontSize: "0.7rem",
                             ml: 0.5,
                           }}
                         />
                       )}
                     </Box>
                   </Box>
-                  
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+                  <Box
+                    sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+                  >
                     {columnDisplayInfos.map((displayInfo, taskIndex) => (
-                      <Fade in={true} timeout={500 + taskIndex * 100} key={`${displayInfo.task.id}-${column.status}`}>
+                      <Fade
+                        in={true}
+                        timeout={500 + taskIndex * 100}
+                        key={`${displayInfo.task.id}-${column.status}`}
+                      >
                         <div>
-                          <TaskCard 
-                            task={displayInfo.task} 
+                          <TaskCard
+                            task={displayInfo.task}
                             filteredLanguages={displayInfo.filteredLanguages}
                             isPartialDisplay={displayInfo.isPartialDisplay}
-                            currentColumnStatus={column.status as LanguageTaskStatus}
-                            onClick={() => handleTaskClick(displayInfo.task)} 
+                            currentColumnStatus={
+                              column.status as LanguageTaskStatus
+                            }
+                            onClick={() => handleTaskClick(displayInfo.task)}
                           />
                         </div>
                       </Fade>
@@ -231,13 +264,13 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
                     {columnDisplayInfos.length === 0 && (
                       <Box
                         sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                           minHeight: 120,
-                          color: '#64748b',
-                          fontSize: '0.875rem',
-                          fontStyle: 'italic',
+                          color: "#64748b",
+                          fontSize: "0.875rem",
+                          fontStyle: "italic",
                         }}
                       >
                         No tasks in this column
@@ -250,7 +283,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
           );
         })}
       </Grid>
-      
+
       <TaskDetailsModal
         task={selectedTask}
         open={isModalOpen}

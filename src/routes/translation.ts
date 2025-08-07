@@ -194,19 +194,33 @@ router.get("/tasks/:taskId", async (req: Request, res: Response) => {
 
 router.get("/tasks", async (req: Request, res: Response) => {
   try {
-    const { status } = req.query;
+    const { status, limit, summary } = req.query as {
+      status?: string;
+      limit?: string;
+      summary?: string;
+    };
+
+    // Summary mode: return minimal fields and allow limiting results
+    const useSummary = summary === "true";
+    const limitNum = limit
+      ? Math.max(1, Math.min(200, parseInt(limit, 10)))
+      : undefined;
 
     // Get both enhanced and legacy tasks
     let legacyTasks: TranslationTask[] = [];
-    let enhancedTasks: EnhancedTranslationTask[] = [];
+    let enhancedTasks: any[] = [];
 
     if (status && typeof status === "string") {
       legacyTasks = await taskService.getTasksByStatus(status as any);
       // For enhanced tasks, we'll need to filter after adding type info since status mapping is complex
-      enhancedTasks = await enhancedTaskService.getAllTasks();
+      enhancedTasks = useSummary
+        ? await enhancedTaskService.getAllTasksSummary(limitNum)
+        : await enhancedTaskService.getAllTasks();
     } else {
       legacyTasks = await taskService.getAllTasks();
-      enhancedTasks = await enhancedTaskService.getAllTasks();
+      enhancedTasks = useSummary
+        ? await enhancedTaskService.getAllTasksSummary(limitNum)
+        : await enhancedTaskService.getAllTasks();
     }
 
     // Add type property to each task

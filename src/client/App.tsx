@@ -115,7 +115,7 @@ const App: React.FC = () => {
         return;
       }
 
-      const response = await fetch("/api/tasks", {
+      const response = await fetch("/api/tasks?summary=true&limit=100", {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",

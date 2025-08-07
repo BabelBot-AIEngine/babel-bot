@@ -16,6 +16,9 @@ export class WebhookSender {
     secret: string,
     options: WebhookDeliveryOptions = {}
   ): Promise<void> {
+    const deliveryMode = (
+      process.env.BABEL_WEBHOOK_DELIVERY_MODE || "hybrid"
+    ).toLowerCase();
     const finalOptions = { ...this.DEFAULT_OPTIONS, ...options };
     const timestampedPayload: BabelWebhookPayload = {
       ...payload,
@@ -27,6 +30,16 @@ export class WebhookSender {
       taskId: timestampedPayload.taskId,
     });
 
+    // If delivery mode is forced to qstash, handoff immediately and return
+    if (deliveryMode === "qstash") {
+      console.log(
+        `BABEL_WEBHOOK_DELIVERY_MODE=qstash → handing off webhook directly to QStash`
+      );
+      await this.handoffToQStash(url, timestampedPayload, secret);
+      return;
+    }
+
+    // Otherwise try direct HTTP first (hybrid/http)
     for (let attempt = 0; attempt < finalOptions.maxRetries; attempt++) {
       try {
         const success = await this.attemptWebhookDelivery(
@@ -60,7 +73,8 @@ export class WebhookSender {
     }
 
     // All retries failed - check if we should attempt handoff to QStash
-    if (finalOptions.skipQStashFallback) {
+    // If explicit http-only, skip qstash fallback entirely
+    if (deliveryMode === "http" || finalOptions.skipQStashFallback) {
       console.warn(
         `⚠️ All webhook delivery attempts failed for ${timestampedPayload.event}:${timestampedPayload.taskId}. ` +
           "QStash fallback disabled. Webhook delivery unsuccessful but processing continues."

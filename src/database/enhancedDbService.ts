@@ -407,18 +407,16 @@ export class EnhancedDatabaseService {
       return [];
     }
 
-    const tasks: EnhancedTranslationTask[] = [];
-    for (const taskId of taskIds) {
-      const task = await this.getEnhancedTask(taskId);
-      if (task) {
-        tasks.push(task);
-      }
-    }
-
-    return tasks.sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    const tasks = await Promise.all(
+      taskIds.map((taskId) => this.getEnhancedTask(taskId))
     );
+
+    return tasks
+      .filter((t): t is EnhancedTranslationTask => Boolean(t))
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
   }
 
   async getLanguageSubTasksByStatus(
@@ -464,15 +462,72 @@ export class EnhancedDatabaseService {
       return [];
     }
 
-    const tasks: EnhancedTranslationTask[] = [];
-    for (const taskId of sortedTaskIds) {
-      const task = await this.getEnhancedTask(taskId);
-      if (task) {
-        tasks.push(task);
-      }
-    }
+    const tasks = await Promise.all(
+      sortedTaskIds.map((taskId) => this.getEnhancedTask(taskId))
+    );
+    return tasks.filter((t): t is EnhancedTranslationTask => Boolean(t));
+  }
 
-    return tasks;
+  async getAllEnhancedTasksSummary(
+    limit?: number
+  ): Promise<
+    Array<
+      Pick<
+        EnhancedTranslationTask,
+        | "id"
+        | "status"
+        | "createdAt"
+        | "updatedAt"
+        | "progress"
+        | "destinationLanguages"
+      >
+    >
+  > {
+    const allIds = (await this.redis.zrange(
+      "enhanced_tasks:created",
+      0,
+      -1
+    )) as string[];
+    const sortedIds = allIds.reverse();
+    const ids =
+      typeof limit === "number" && limit > 0
+        ? sortedIds.slice(0, limit)
+        : sortedIds;
+
+    if (ids.length === 0) return [];
+
+    const fields = [
+      "id",
+      "status",
+      "createdAt",
+      "updatedAt",
+      "progress",
+      "destinationLanguages",
+    ] as const;
+
+    const summaries = await Promise.all(
+      ids.map(async (id) => {
+        const values = (await this.redis.hmget(
+          `enhanced_task:${id}`,
+          ...fields
+        )) as Record<string, string>;
+
+        return {
+          id: values.id,
+          status: values.status as TaskStatus,
+          createdAt: values.createdAt,
+          updatedAt: values.updatedAt,
+          progress: parseInt(values.progress) || 0,
+          destinationLanguages: this.safeJSONParse(
+            values.destinationLanguages,
+            [],
+            "destinationLanguages"
+          ),
+        };
+      })
+    );
+
+    return summaries;
   }
 
   // Utility Methods

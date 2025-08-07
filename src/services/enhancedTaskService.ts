@@ -900,6 +900,22 @@ export class EnhancedTaskService {
     return this.dbService.getAllEnhancedTasks();
   }
 
+  async getAllTasksSummary(
+    limit?: number
+  ): Promise<
+    Pick<
+      EnhancedTranslationTask,
+      | "id"
+      | "status"
+      | "createdAt"
+      | "updatedAt"
+      | "progress"
+      | "destinationLanguages"
+    >[]
+  > {
+    return this.dbService.getAllEnhancedTasksSummary(limit);
+  }
+
   async getTasksByStatus(
     status: TaskStatus
   ): Promise<EnhancedTranslationTask[]> {

@@ -70,7 +70,7 @@ export class QStashService {
         url,
         body: qstashPayload,
         headers,
-        retries: 5, // More aggressive retries for critical events
+        retries: 3, // More aggressive retries for critical events
         delay: 30, // 30 second initial delay
         // QStash will handle exponential backoff automatically
       });
