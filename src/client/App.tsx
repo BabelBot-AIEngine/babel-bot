@@ -33,6 +33,8 @@ import {
   useAuth,
   SignOutButton,
 } from "@clerk/clerk-react";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import KanbanBoard from "./components/KanbanBoard";
 import CreateTaskDialog from "./components/CreateTaskDialog";
 import { TranslationTask } from "../types";
@@ -186,6 +188,8 @@ const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <Analytics />
+      <SpeedInsights />
       <Box
         sx={{
           flexGrow: 1,
