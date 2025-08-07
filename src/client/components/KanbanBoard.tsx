@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import {
   Grid,
   Paper,
@@ -83,6 +84,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
     null
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { getToken } = useAuth();
 
   const getTaskDisplayInfosByStatus = (
     status: string
@@ -114,7 +116,15 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({ tasks, loading }) => {
   const handleTaskClick = async (task: TranslationTask) => {
     // Fetch full task details on open in case we are using summary list
     try {
-      const res = await fetch(`/api/tasks/${task.id}`);
+      const token = await getToken();
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            }
+          : { "Content-Type": "application/json" },
+      });
       if (res.ok) {
         const data = await res.json();
         setSelectedTask(data.task as TranslationTask);
